@@ -1,5 +1,0 @@
-Place the SaM 2.6.3 JAR in this directory with this filename:
-
-SaM-2.6.3.jar
-
-If your filename differs, edit the SAM_JAR constant near the top of ../app.js.
