@@ -1,4 +1,23 @@
-const SAM_CLASSPATH = "/app/jar/sam-web-bridge.jar:/app/jar/SaM-2.6.3.jar";
+function getCheerpJAppBase() {
+  let path = window.location.pathname || "/";
+
+  // If this page was loaded through an explicit file URL such as /index.html,
+  // strip the filename so /app still points at the containing web directory.
+  if (!path.endsWith("/")) {
+    const lastSlash = path.lastIndexOf("/");
+    path = path.slice(0, lastSlash + 1);
+  }
+
+  // CheerpJ mounts the web-server root at /app. Preserve any deployment
+  // subdirectory (for example /sam-web-ide/) beneath that mount.
+  const normalized = path.replace(/\/{2,}/g, "/").replace(/\/$/, "");
+  return `/app${normalized}` || "/app";
+}
+
+const SAM_APP_BASE = getCheerpJAppBase();
+const SAM_BRIDGE_JAR = `${SAM_APP_BASE}/jar/sam-web-bridge.jar`;
+const SAM_RUNTIME_JAR = `${SAM_APP_BASE}/jar/SaM-2.6.3.jar`;
+const SAM_CLASSPATH = `${SAM_BRIDGE_JAR}:${SAM_RUNTIME_JAR}`;
 const AUTOSAVE_KEY = "sam-web-ide-source-v10";
 const FILENAME_KEY = "sam-web-ide-filename-v1";
 
@@ -540,8 +559,14 @@ async function startSaM() {
     runtimeStatus.textContent = "SaM: failed to start";
     runtimeStatus.className = "status status-error";
     placeholder.style.display = "grid";
-    placeholder.innerHTML = `<p><strong>Could not launch SaM.</strong></p><p>Check that both JARs exist under <code>jar/</code> and that the site is served over HTTP.</p>`;
-    notify(`SaM did not start: ${errorText(error)}`, true);
+    placeholder.innerHTML = `
+      <div>
+        <p><strong>Could not launch SaM.</strong></p>
+        <p>CheerpJ resolved the JARs as:</p>
+        <p><code>${escapeHtml(SAM_BRIDGE_JAR)}</code><br><code>${escapeHtml(SAM_RUNTIME_JAR)}</code></p>
+        <p>Check that those files exist at the corresponding site path and that the site is served over HTTP/HTTPS.</p>
+      </div>`;
+    notify(`SaM did not start: ${errorText(error)} | ${SAM_CLASSPATH}`, true);
   }
 }
 startSaM();

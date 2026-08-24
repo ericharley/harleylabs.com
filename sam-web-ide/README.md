@@ -139,3 +139,14 @@ Breakpoints are intentionally managed only through the original SaM Swing UI. Th
 ### Autocomplete behavior
 
 Autocomplete is driven by editor text changes rather than raw keyboard events, so typing uppercase instructions with Shift does not dismiss the suggestion list. Type two or more characters or press `Ctrl-Space` / `Cmd-Space`; use Up/Down and Enter/Tab to choose a completion.
+
+## Hosting from a subdirectory / GitHub Pages
+
+The CheerpJ JAR classpath is derived from `window.location.pathname`, so the same build works both at the web root and beneath a deployment prefix.
+
+Examples:
+
+- `http://localhost:8080/` resolves the JARs under `/app/jar/`;
+- `https://example.com/sam-web-ide/` resolves them under `/app/sam-web-ide/jar/`.
+
+No hard-coded GitHub Pages repository name is required. If SaM fails to start, the simulator pane now shows the exact CheerpJ JAR paths it attempted to load.
