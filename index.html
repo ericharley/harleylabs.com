@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>SaM Web IDE</title>
+    <link rel="stylesheet" href="./vendor/codemirror/codemirror.css" />
+    <link rel="stylesheet" href="./styles.css?v=editor-v9" />
+    <script src="./vendor/codemirror/codemirror.js"></script>
+    <script src="./vendor/codemirror/addon/selection/active-line.js"></script>
+    <script src="./vendor/codemirror/addon/edit/matchbrackets.js"></script>
+    <script src="./vendor/codemirror/addon/edit/closebrackets.js"></script>
+    <script src="https://cjrtnc.leaningtech.com/4.3/loader.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">SaM</div>
+        <div>
+          <h1>SaM Web IDE</h1>
+          <p>Stack Machine editor + simulator</p>
+        </div>
+      </div>
+      <div class="status-row">
+        <span id="runtimeStatus" class="status status-loading">CheerpJ: starting…</span>
+        <label class="filename-field" title="Rename the current SaM source file">
+          <span class="filename-label">File</span>
+          <input id="filenameInput" type="text" value="untitled.sam" spellcheck="false" aria-label="Current filename" />
+        </label>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="pane editor-pane" aria-label="SaM source editor">
+        <div class="pane-toolbar">
+          <div class="toolbar-group">
+            <button id="newBtn" type="button">New</button>
+            <button id="openBtn" type="button">Open</button>
+            <button id="saveBtn" type="button">Download</button>
+            <input id="fileInput" type="file" accept=".sam,text/plain" hidden />
+          </div>
+          <div class="toolbar-group">
+            <button id="runBtn" class="primary" type="button" disabled>Run</button>
+            <button id="stepBtn" type="button" disabled>Step</button>
+            <button id="resetBtn" type="button" disabled>Reset</button>
+            <button id="stopBtn" type="button" disabled>Stop</button>
+          </div>
+        </div>
+
+        <div id="editor" class="editor-host"></div>
+
+        <div id="diagnostics" class="diagnostics" hidden>
+          <span class="diagnostic-icon">!</span>
+          <span id="diagnosticMessage" class="diagnostic-message"></span>
+          <button id="diagnosticClose" class="diagnostic-close" type="button" title="Dismiss diagnostic" aria-label="Dismiss diagnostic">×</button>
+        </div>
+
+        <div class="editor-footer">
+          <span id="cursorStatus">Ln 1, Col 1</span>
+          <span id="executionStatus">Modified</span>
+          <span>SaM assembly</span>
+        </div>
+      </section>
+
+      <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" tabindex="0"></div>
+
+      <section class="pane simulator-pane" aria-label="SaM simulator">
+        <div class="pane-toolbar simulator-toolbar">
+          <strong>Simulator</strong>
+          <span class="hint">Original SaM 2.6.3 Swing simulator, driven directly from the editor.</span>
+        </div>
+        <div id="samDisplay" class="sam-display">
+          <div id="samPlaceholder" class="placeholder">
+            <div class="spinner"></div>
+            <p>Starting SaM under CheerpJ…</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="./app.js?v=editor-v9"></script>
+  </body>
+</html>
