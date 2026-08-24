@@ -18,8 +18,63 @@ const SAM_APP_BASE = getCheerpJAppBase();
 const SAM_BRIDGE_JAR = `${SAM_APP_BASE}/jar/sam-web-bridge.jar`;
 const SAM_RUNTIME_JAR = `${SAM_APP_BASE}/jar/SaM-2.6.3.jar`;
 const SAM_CLASSPATH = `${SAM_BRIDGE_JAR}:${SAM_RUNTIME_JAR}`;
-const AUTOSAVE_KEY = "sam-web-ide-source-v10";
-const FILENAME_KEY = "sam-web-ide-filename-v1";
+const WORKSPACE_KEY = "sam-web-ide-workspace-v13";
+const SETTINGS_KEY = "sam-web-ide-settings-v13";
+const SPLIT_KEY = "sam-web-ide-split-v13";
+const HELP_SEEN_KEY = "sam-web-ide-help-seen-v14";
+const MOBILE_VIEW_KEY = "sam-web-ide-mobile-view-v14";
+
+const SHARE_VERSION = "1";
+
+function bytesToBase64Url(bytes) {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + 0x8000, bytes.length)));
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64UrlToBytes(value) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, char => char.charCodeAt(0));
+}
+
+function encodeSharePayload(tab) {
+  const payload = JSON.stringify({
+    v: SHARE_VERSION,
+    filename: normalizeFilename(tab.filename),
+    source: tab.source,
+  });
+  return bytesToBase64Url(new TextEncoder().encode(payload));
+}
+
+function decodeSharePayload(value) {
+  const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(value)));
+  if (!payload || String(payload.v) !== SHARE_VERSION || typeof payload.source !== "string") {
+    throw new Error("Unsupported shared program");
+  }
+  return {
+    filename: normalizeFilename(payload.filename || "shared.sam"),
+    source: payload.source,
+  };
+}
+
+function sharedProgramFromLocation() {
+  if (!window.location.hash.startsWith("#share=")) return null;
+  try {
+    return decodeSharePayload(window.location.hash.slice("#share=".length));
+  } catch (error) {
+    console.warn("Could not decode shared SaM program", error);
+    return { error };
+  }
+}
+
+function clearShareFragment() {
+  if (!window.location.hash.startsWith("#share=")) return;
+  history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+}
 
 const starterProgram = `// SaM Web IDE\n// Edit this program, then Run or Step.\n\nPUSHIMM 10\nPUSHIMM 20\nADD\nWRITE\nSTOP\n`;
 
@@ -87,6 +142,7 @@ const filenameInput = document.querySelector("#filenameInput");
 const cursorStatus = document.querySelector("#cursorStatus");
 const executionStatus = document.querySelector("#executionStatus");
 const fileInput = document.querySelector("#fileInput");
+const shareBtn = document.querySelector("#shareBtn");
 const runBtn = document.querySelector("#runBtn");
 const stepBtn = document.querySelector("#stepBtn");
 const resetBtn = document.querySelector("#resetBtn");
@@ -111,42 +167,196 @@ function normalizeFilename(name) {
   if (!cleaned) return "untitled.sam";
   return cleaned.toLowerCase().endsWith(".sam") ? cleaned : `${cleaned}.sam`;
 }
-function savedFilename() {
-  try { return normalizeFilename(localStorage.getItem(FILENAME_KEY) || "untitled.sam"); }
-  catch { return "untitled.sam"; }
+function makeTab({ filename = "untitled.sam", source = starterProgram, dirty = true } = {}) {
+  return {
+    id: `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    filename: normalizeFilename(filename), source, dirty,
+    cursor: { line: 0, ch: 0 }, scrollTop: 0,
+  };
 }
-function setFilename(name, { selectStem = false } = {}) {
-  filenameInput.value = normalizeFilename(name);
-  try { localStorage.setItem(FILENAME_KEY, filenameInput.value); } catch {}
-  if (selectStem) {
-    const end = Math.max(0, filenameInput.value.toLowerCase().lastIndexOf(".sam"));
-    filenameInput.focus();
-    filenameInput.setSelectionRange(0, end || filenameInput.value.length);
-  }
-}
-filenameInput.value = savedFilename();
-
-function savedSource() {
+function legacyWorkspace() {
+  let source = starterProgram;
+  let filename = "untitled.sam";
   try {
-    return localStorage.getItem(AUTOSAVE_KEY)
+    source = localStorage.getItem("sam-web-ide-source-v10")
       || localStorage.getItem("sam-web-ide-source-v9")
       || localStorage.getItem("sam-web-ide-source-v8")
       || localStorage.getItem("sam-web-ide-source-v7")
       || localStorage.getItem("sam-web-ide-source-v6")
-      || localStorage.getItem("sam-web-ide-source-v5")
-      || starterProgram;
-  } catch { return starterProgram; }
+      || localStorage.getItem("sam-web-ide-source-v5") || starterProgram;
+    filename = normalizeFilename(localStorage.getItem("sam-web-ide-filename-v1") || "untitled.sam");
+  } catch {}
+  const tab = makeTab({ filename, source, dirty: source !== starterProgram });
+  return { activeId: tab.id, tabs: [tab] };
+}
+function loadWorkspace() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(WORKSPACE_KEY) || "null");
+    if (parsed && Array.isArray(parsed.tabs) && parsed.tabs.length) {
+      parsed.tabs = parsed.tabs.map(tab => ({ ...makeTab(), ...tab, filename: normalizeFilename(tab.filename) }));
+      if (!parsed.tabs.some(tab => tab.id === parsed.activeId)) parsed.activeId = parsed.tabs[0].id;
+      return parsed;
+    }
+  } catch (error) { console.warn("Could not restore workspace", error); }
+  return legacyWorkspace();
+}
+const defaultSettings = {
+  theme: "dark", fontSize: 14, fontFamily: "system-mono",
+  tabWidth: 2, lineWrapping: true, pcHighlight: true,
+};
+function loadSettings() {
+  try { return { ...defaultSettings, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") }; }
+  catch { return { ...defaultSettings }; }
+}
+let workspaceState = loadWorkspace();
+let editorSettings = loadSettings();
+let switchingTabs = false;
+const tabsHost = document.querySelector("#tabs");
+const newTabBtn = document.querySelector("#newTabBtn");
+const settingsBtn = document.querySelector("#settingsBtn");
+const settingsPanel = document.querySelector("#settingsPanel");
+const themeSelect = document.querySelector("#themeSelect");
+const fontSizeInput = document.querySelector("#fontSizeInput");
+const fontSizeOutput = document.querySelector("#fontSizeOutput");
+const fontFamilySelect = document.querySelector("#fontFamilySelect");
+const tabWidthSelect = document.querySelector("#tabWidthSelect");
+const lineWrapInput = document.querySelector("#lineWrapInput");
+const pcHighlightInput = document.querySelector("#pcHighlightInput");
+const aboutHelpBtn = document.querySelector("#aboutHelpBtn");
+const helpModal = document.querySelector("#helpModal");
+const helpCloseBtn = document.querySelector("#helpCloseBtn");
+const helpDoneBtn = document.querySelector("#helpDoneBtn");
+const showHelpOnStartInput = document.querySelector("#showHelpOnStartInput");
+const workspaceEl = document.querySelector(".workspace");
+const mobileEditorBtn = document.querySelector("#mobileEditorBtn");
+const mobileSimulatorBtn = document.querySelector("#mobileSimulatorBtn");
+
+function activeTab() { return workspaceState.tabs.find(tab => tab.id === workspaceState.activeId) || workspaceState.tabs[0]; }
+function persistWorkspace() {
+  try { localStorage.setItem(WORKSPACE_KEY, JSON.stringify(workspaceState)); } catch {}
+}
+function persistSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(editorSettings)); } catch {}
 }
 
 const editor = CodeMirror(document.querySelector("#editor"), {
-  value: savedSource(), mode: "sam", theme: "samweb", lineNumbers: true,
+  value: activeTab().source, mode: "sam", theme: "samweb", lineNumbers: true,
   gutters: ["CodeMirror-linenumbers", "execution-gutter", "diagnostics-gutter"],
-  lineWrapping: true, styleActiveLine: true, matchBrackets: true,
-  autoCloseBrackets: true, indentUnit: 2, tabSize: 2, indentWithTabs: false,
-  cursorBlinkRate: 530,
+  lineWrapping: editorSettings.lineWrapping, styleActiveLine: true, matchBrackets: true,
+  autoCloseBrackets: true, indentUnit: editorSettings.tabWidth, tabSize: editorSettings.tabWidth,
+  indentWithTabs: false, cursorBlinkRate: 530,
 });
 editor.setSize("100%", "100%");
 
+function fontFamilyValue(setting) {
+  if (setting === "courier") return '"Courier New", Courier, monospace';
+  if (setting === "menlo") return 'Menlo, Consolas, "Liberation Mono", monospace';
+  return '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace';
+}
+function applySettings({ refresh = true } = {}) {
+  document.documentElement.dataset.theme = editorSettings.theme;
+  document.documentElement.style.setProperty("--editor-font-size", `${editorSettings.fontSize}px`);
+  document.documentElement.style.setProperty("--editor-font-family", fontFamilyValue(editorSettings.fontFamily));
+  editor.setOption("lineWrapping", !!editorSettings.lineWrapping);
+  editor.setOption("tabSize", Number(editorSettings.tabWidth));
+  editor.setOption("indentUnit", Number(editorSettings.tabWidth));
+  themeSelect.value = editorSettings.theme;
+  fontSizeInput.value = editorSettings.fontSize;
+  fontSizeOutput.textContent = `${editorSettings.fontSize}px`;
+  fontFamilySelect.value = editorSettings.fontFamily;
+  tabWidthSelect.value = String(editorSettings.tabWidth);
+  lineWrapInput.checked = !!editorSettings.lineWrapping;
+  pcHighlightInput.checked = !!editorSettings.pcHighlight;
+  if (!editorSettings.pcHighlight && executionLine !== null) editor.removeLineClass(executionLine, "text", "sam-current-instruction-text");
+  if (refresh) setTimeout(() => editor.refresh(), 0);
+}
+function saveActiveEditorState() {
+  const tab = activeTab();
+  if (!tab) return;
+  tab.source = editor.getValue();
+  tab.cursor = editor.getCursor();
+  tab.scrollTop = editor.getScrollInfo().top;
+}
+function renderTabs() {
+  tabsHost.replaceChildren();
+  for (const tab of workspaceState.tabs) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `editor-tab${tab.id === workspaceState.activeId ? " active" : ""}`;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", tab.id === workspaceState.activeId ? "true" : "false");
+    button.title = tab.filename;
+    const name = document.createElement("span");
+    name.className = "tab-name";
+    name.textContent = tab.filename;
+    const dirty = document.createElement("span");
+    dirty.className = "tab-dirty";
+    dirty.textContent = tab.dirty ? "•" : "";
+    dirty.title = tab.dirty ? "Modified" : "";
+    const close = document.createElement("span");
+    close.className = "tab-close";
+    close.textContent = "×";
+    close.title = `Close ${tab.filename}`;
+    close.addEventListener("click", event => { event.stopPropagation(); closeTab(tab.id); });
+    button.append(name, dirty, close);
+    button.addEventListener("click", () => switchTab(tab.id));
+    tabsHost.appendChild(button);
+  }
+}
+function updateActiveTabUI() {
+  const tab = activeTab();
+  filenameInput.value = tab.filename;
+  document.title = `${tab.filename} — SaM Web IDE`;
+  renderTabs();
+}
+function switchTab(id) {
+  if (id === workspaceState.activeId) return;
+  saveActiveEditorState();
+  workspaceState.activeId = id;
+  const tab = activeTab();
+  switchingTabs = true;
+  clearDiagnostics(); clearExecutionHighlight(); lastLoadedSource = null; instructionLines = [];
+  editor.setValue(tab.source);
+  editor.setCursor(tab.cursor || { line: 0, ch: 0 });
+  editor.scrollTo(null, tab.scrollTop || 0);
+  switchingTabs = false;
+  updateActiveTabUI(); persistWorkspace(); updateCursorStatus(); editor.focus();
+}
+function createNewTab({ filename = "untitled.sam", source = starterProgram, dirty = true, selectStem = true } = {}) {
+  saveActiveEditorState();
+  const tab = makeTab({ filename, source, dirty });
+  workspaceState.tabs.push(tab);
+  workspaceState.activeId = tab.id;
+  switchingTabs = true;
+  clearDiagnostics(); clearExecutionHighlight(); lastLoadedSource = null; instructionLines = [];
+  editor.setValue(tab.source); editor.setCursor({ line: 0, ch: 0 }); editor.scrollTo(null, 0);
+  switchingTabs = false;
+  updateActiveTabUI(); persistWorkspace(); editor.focus();
+  if (selectStem) {
+    const end = Math.max(0, filenameInput.value.toLowerCase().lastIndexOf(".sam"));
+    filenameInput.focus(); filenameInput.setSelectionRange(0, end || filenameInput.value.length);
+  }
+  return tab;
+}
+function closeTab(id = workspaceState.activeId) {
+  const tab = workspaceState.tabs.find(item => item.id === id);
+  if (!tab) return;
+  if (tab.dirty && !window.confirm(`${tab.filename} has changes that have not been downloaded. Close it anyway?`)) return;
+  saveActiveEditorState();
+  const index = workspaceState.tabs.findIndex(item => item.id === id);
+  workspaceState.tabs.splice(index, 1);
+  if (!workspaceState.tabs.length) workspaceState.tabs.push(makeTab());
+  if (workspaceState.activeId === id) workspaceState.activeId = workspaceState.tabs[Math.min(index, workspaceState.tabs.length - 1)].id;
+  const next = activeTab();
+  switchingTabs = true;
+  clearDiagnostics(); clearExecutionHighlight(); lastLoadedSource = null; instructionLines = [];
+  editor.setValue(next.source); editor.setCursor(next.cursor || { line: 0, ch: 0 }); editor.scrollTo(null, next.scrollTop || 0);
+  switchingTabs = false;
+  updateActiveTabUI(); persistWorkspace(); editor.focus();
+}
+
+applySettings({ refresh: false });
+updateActiveTabUI();
 
 // Lightweight SaM autocomplete: ISA opcodes + labels in the current buffer.
 const completionPopup = document.createElement("div");
@@ -303,20 +513,36 @@ function updateCursorStatus() {
 function markDirty() {
   clearDiagnostics();
   clearExecutionHighlight();
+  if (lastLoadedSource !== editor.getValue()) instructionLines = [];
+  const tab = activeTab();
+  if (!switchingTabs && tab) {
+    tab.source = editor.getValue();
+    tab.cursor = editor.getCursor();
+    tab.dirty = true;
+    persistWorkspace();
+    renderTabs();
+  }
   executionStatus.textContent = lastLoadedSource === editor.getValue() ? "Loaded" : "Modified";
 }
 editor.on("change", (_cm, change) => {
-  try { localStorage.setItem(AUTOSAVE_KEY, editor.getValue()); } catch {}
   updateCursorStatus();
-  markDirty();
+  if (!switchingTabs) markDirty();
   updateCompletionsAfterEdit(change);
 });
-editor.on("cursorActivity", updateCursorStatus);
+editor.on("cursorActivity", () => {
+  updateCursorStatus();
+  const tab = activeTab();
+  if (tab && !switchingTabs) { tab.cursor = editor.getCursor(); persistWorkspace(); }
+});
+editor.on("scroll", () => {
+  const tab = activeTab();
+  if (tab && !switchingTabs) { tab.scrollTop = editor.getScrollInfo().top; persistWorkspace(); }
+});
 updateCursorStatus();
 
 function setEditorText(text) { editor.setValue(text); editor.focus(); }
 function sourceText() { return editor.getValue(); }
-function currentFilename() { return normalizeFilename(filenameInput.value); }
+function currentFilename() { return activeTab()?.filename || normalizeFilename(filenameInput.value); }
 
 function notify(message, isError = false) {
   clearTimeout(toastTimer);
@@ -326,9 +552,20 @@ function notify(message, isError = false) {
   toastTimer = setTimeout(() => toast.classList.remove("show"), 4200);
 }
 
-function setFilenameAndPersist() { setFilename(filenameInput.value); }
+function setFilenameAndPersist() {
+  const tab = activeTab();
+  if (!tab) return;
+  const next = normalizeFilename(filenameInput.value);
+  if (tab.filename !== next) tab.dirty = true;
+  tab.filename = next;
+  filenameInput.value = next;
+  persistWorkspace(); renderTabs();
+}
 filenameInput.addEventListener("input", () => {
-  try { localStorage.setItem(FILENAME_KEY, filenameInput.value); } catch {}
+  const tab = activeTab();
+  if (!tab) return;
+  tab.filename = filenameInput.value || "untitled.sam";
+  tab.dirty = true; persistWorkspace(); renderTabs();
 });
 filenameInput.addEventListener("change", setFilenameAndPersist);
 filenameInput.addEventListener("keydown", (event) => {
@@ -350,6 +587,9 @@ function downloadSource() {
   const a = document.createElement("a");
   a.href = url; a.download = currentFilename(); document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
+  const tab = activeTab();
+  if (tab) { tab.source = sourceText(); tab.dirty = false; persistWorkspace(); renderTabs(); }
+  notify(`Downloaded ${currentFilename()}.`);
 }
 
 function clearDiagnostics() {
@@ -427,7 +667,7 @@ function highlightPC(pc) {
   marker.textContent = "▶";
   marker.title = `Next instruction (PC ${pc})`;
   editor.setGutterMarker(line, "execution-gutter", marker);
-  editor.addLineClass(line, "text", "sam-current-instruction-text");
+  if (editorSettings.pcHighlight) editor.addLineClass(line, "text", "sam-current-instruction-text");
   executionLine = line;
   executionGutterLine = line;
   executionStatus.textContent = `PC ${pc} · line ${line + 1}`;
@@ -487,16 +727,49 @@ async function ensureCurrentSourceLoaded({ quiet = false, force = false } = {}) 
   }
 }
 
-document.querySelector("#newBtn").addEventListener("click", () => {
-  setFilename("untitled.sam", { selectStem: true });
-  lastLoadedSource = null;
-  setEditorText(starterProgram);
-});
-document.querySelector("#openBtn").addEventListener("click", () => fileInput.click());
+
+async function shareActiveProgram() {
+  saveActiveEditorState();
+  const tab = activeTab();
+  const url = new URL(window.location.href);
+  url.hash = `share=${encodeSharePayload(tab)}`;
+  try {
+    await navigator.clipboard.writeText(url.toString());
+    notify("Shareable program URL copied.");
+  } catch {
+    window.prompt("Copy this shareable program URL:", url.toString());
+  }
+}
+
+function importSharedProgram() {
+  const shared = sharedProgramFromLocation();
+  if (!shared) return;
+  if (shared.error) {
+    notify("This shared SaM URL could not be decoded.", true);
+    clearShareFragment();
+    return;
+  }
+  createNewTab({
+    filename: shared.filename,
+    source: shared.source,
+    dirty: true,
+    selectStem: false,
+  });
+  clearShareFragment();
+  notify(`Opened shared program ${shared.filename}.`);
+}
+
+function newFile() { createNewTab(); }
+function openFilePicker() { fileInput.click(); }
+document.querySelector("#newBtn").addEventListener("click", newFile);
+newTabBtn.addEventListener("click", newFile);
+document.querySelector("#openBtn").addEventListener("click", openFilePicker);
+shareBtn.addEventListener("click", shareActiveProgram);
 fileInput.addEventListener("change", async () => {
-  const file = fileInput.files?.[0]; if (!file) return;
-  setFilename(file.name || "program.sam"); lastLoadedSource = null; setEditorText(await file.text());
-  fileInput.value = ""; notify(`Opened ${currentFilename()}`);
+  const files = [...(fileInput.files || [])];
+  for (const file of files) createNewTab({ filename: file.name || "program.sam", source: await file.text(), dirty: false, selectStem: false });
+  fileInput.value = "";
+  if (files.length) notify(`Opened ${files.length === 1 ? files[0].name : `${files.length} files`}.`);
 });
 document.querySelector("#saveBtn").addEventListener("click", downloadSource);
 
@@ -523,8 +796,104 @@ stopBtn.addEventListener("click", async () => {
 
 document.querySelector("#diagnosticClose").addEventListener("click", clearDiagnostics);
 
+
+function openHelp() {
+  settingsPanel.hidden = true;
+  settingsBtn.setAttribute("aria-expanded", "false");
+  helpModal.hidden = false;
+  showHelpOnStartInput.checked = true;
+  setTimeout(() => helpDoneBtn.focus(), 0);
+}
+function closeHelp({ markSeen = true } = {}) {
+  if (markSeen) {
+    try { localStorage.setItem(HELP_SEEN_KEY, "1"); } catch {}
+  }
+  helpModal.hidden = true;
+  editor.refresh();
+}
+function maybeShowFirstRunHelp() {
+  let seen = false;
+  try { seen = localStorage.getItem(HELP_SEEN_KEY) === "1"; } catch {}
+  if (!seen) openHelp();
+}
+function setMobileView(view, { persist = true } = {}) {
+  const normalized = view === "simulator" ? "simulator" : "editor";
+  workspaceEl.dataset.mobileView = normalized;
+  mobileEditorBtn.classList.toggle("active", normalized === "editor");
+  mobileSimulatorBtn.classList.toggle("active", normalized === "simulator");
+  mobileEditorBtn.setAttribute("aria-pressed", String(normalized === "editor"));
+  mobileSimulatorBtn.setAttribute("aria-pressed", String(normalized === "simulator"));
+  if (persist) { try { localStorage.setItem(MOBILE_VIEW_KEY, normalized); } catch {} }
+  requestAnimationFrame(() => {
+    editor.refresh();
+    window.dispatchEvent(new Event("resize"));
+  });
+}
+function restoreMobileView() {
+  let saved = "editor";
+  try { saved = localStorage.getItem(MOBILE_VIEW_KEY) || "editor"; } catch {}
+  setMobileView(saved, { persist: false });
+}
+
+function setSetting(name, value) {
+  editorSettings[name] = value;
+  persistSettings(); applySettings();
+  if (name === "pcHighlight" && value && executionLine !== null) {
+    editor.addLineClass(executionLine, "text", "sam-current-instruction-text");
+  }
+}
+settingsBtn.addEventListener("click", event => {
+  event.stopPropagation();
+  const opening = settingsPanel.hidden;
+  settingsPanel.hidden = !opening;
+  settingsBtn.setAttribute("aria-expanded", String(opening));
+});
+settingsPanel.addEventListener("click", event => event.stopPropagation());
+aboutHelpBtn.addEventListener("click", openHelp);
+helpCloseBtn.addEventListener("click", () => closeHelp());
+helpDoneBtn.addEventListener("click", () => closeHelp());
+helpModal.addEventListener("click", event => { if (event.target === helpModal) closeHelp(); });
+showHelpOnStartInput.addEventListener("change", () => {
+  if (!showHelpOnStartInput.checked) {
+    try { localStorage.setItem(HELP_SEEN_KEY, "1"); } catch {}
+  }
+});
+mobileEditorBtn.addEventListener("click", () => setMobileView("editor"));
+mobileSimulatorBtn.addEventListener("click", () => setMobileView("simulator"));
+document.addEventListener("click", () => {
+  if (!settingsPanel.hidden) { settingsPanel.hidden = true; settingsBtn.setAttribute("aria-expanded", "false"); }
+});
+themeSelect.addEventListener("change", () => setSetting("theme", themeSelect.value));
+fontSizeInput.addEventListener("input", () => { editorSettings.fontSize = Number(fontSizeInput.value); fontSizeOutput.textContent = `${editorSettings.fontSize}px`; persistSettings(); applySettings(); });
+fontFamilySelect.addEventListener("change", () => setSetting("fontFamily", fontFamilySelect.value));
+tabWidthSelect.addEventListener("change", () => setSetting("tabWidth", Number(tabWidthSelect.value)));
+lineWrapInput.addEventListener("change", () => setSetting("lineWrapping", lineWrapInput.checked));
+pcHighlightInput.addEventListener("change", () => setSetting("pcHighlight", pcHighlightInput.checked));
+document.querySelector("#resetSettingsBtn").addEventListener("click", () => {
+  editorSettings = { ...defaultSettings }; persistSettings(); applySettings(); notify("Editor settings reset.");
+});
+
+// Familiar desktop-editor shortcuts. Browser defaults are suppressed only for
+// shortcuts the IDE actually handles.
+document.addEventListener("keydown", event => {
+  const mod = event.ctrlKey || event.metaKey;
+  const key = event.key.toLowerCase();
+  if (mod && key === "s") { event.preventDefault(); downloadSource(); return; }
+  if (mod && key === "o") { event.preventDefault(); openFilePicker(); return; }
+  if (mod && key === "n") { event.preventDefault(); newFile(); return; }
+  if (mod && key === "w") { event.preventDefault(); closeTab(); return; }
+  if (mod && event.key === "Enter") { event.preventDefault(); if (!runBtn.disabled) runBtn.click(); return; }
+  if (event.key === "F10") { event.preventDefault(); if (!stepBtn.disabled) stepBtn.click(); return; }
+  if (event.key === "Escape" && !helpModal.hidden) { event.preventDefault(); closeHelp(); }
+});
+
 const splitter = document.querySelector("#splitter");
+try {
+  const savedSplit = Number(localStorage.getItem(SPLIT_KEY));
+  if (savedSplit >= 25 && savedSplit <= 72) document.documentElement.style.setProperty("--editor-width", `${savedSplit}%`);
+} catch {}
 let dragging = false;
+let splitPct = null;
 splitter.addEventListener("pointerdown", (event) => {
   if (window.matchMedia("(max-width: 900px)").matches) return;
   dragging = true; splitter.setPointerCapture(event.pointerId);
@@ -532,9 +901,14 @@ splitter.addEventListener("pointerdown", (event) => {
 splitter.addEventListener("pointermove", (event) => {
   if (!dragging) return;
   const pct = Math.min(72, Math.max(25, (event.clientX / window.innerWidth) * 100));
+  splitPct = pct;
   document.documentElement.style.setProperty("--editor-width", `${pct}%`);
+  editor.refresh();
 });
-splitter.addEventListener("pointerup", () => { dragging = false; });
+splitter.addEventListener("pointerup", () => {
+  dragging = false;
+  if (splitPct !== null) { try { localStorage.setItem(SPLIT_KEY, String(splitPct)); } catch {} }
+});
 splitter.addEventListener("pointercancel", () => { dragging = false; });
 
 async function startSaM() {
@@ -569,4 +943,7 @@ async function startSaM() {
     notify(`SaM did not start: ${errorText(error)} | ${SAM_CLASSPATH}`, true);
   }
 }
+restoreMobileView();
+importSharedProgram();
+maybeShowFirstRunHelp();
 startSaM();

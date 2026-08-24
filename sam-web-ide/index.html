@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark light" />
     <title>SaM Web IDE</title>
     <link rel="stylesheet" href="./vendor/codemirror/codemirror.css" />
-    <link rel="stylesheet" href="./styles.css?v=editor-v9" />
+    <link rel="stylesheet" href="./styles.css?v=editor-v15" />
     <script src="./vendor/codemirror/codemirror.js"></script>
     <script src="./vendor/codemirror/addon/selection/active-line.js"></script>
     <script src="./vendor/codemirror/addon/edit/matchbrackets.js"></script>
@@ -24,21 +24,28 @@
       </div>
       <div class="status-row">
         <span id="runtimeStatus" class="status status-loading">CheerpJ: starting…</span>
-        <label class="filename-field" title="Rename the current SaM source file">
+        <label class="filename-field" title="Rename the active SaM source file">
           <span class="filename-label">File</span>
           <input id="filenameInput" type="text" value="untitled.sam" spellcheck="false" aria-label="Current filename" />
         </label>
+        <button id="settingsBtn" class="icon-button" type="button" title="Editor settings" aria-label="Editor settings" aria-expanded="false">⚙</button>
       </div>
     </header>
 
-    <main class="workspace">
+    <div class="mobile-view-switcher" role="group" aria-label="Mobile workspace view">
+      <button id="mobileEditorBtn" class="mobile-view-button active" type="button" aria-pressed="true">Editor</button>
+      <button id="mobileSimulatorBtn" class="mobile-view-button" type="button" aria-pressed="false">Simulator</button>
+    </div>
+
+    <main class="workspace" data-mobile-view="editor">
       <section class="pane editor-pane" aria-label="SaM source editor">
         <div class="pane-toolbar">
           <div class="toolbar-group">
             <button id="newBtn" type="button">New</button>
             <button id="openBtn" type="button">Open</button>
             <button id="saveBtn" type="button">Download</button>
-            <input id="fileInput" type="file" accept=".sam,text/plain" hidden />
+            <button id="shareBtn" type="button" title="Copy a shareable URL for the active program">Share</button>
+            <input id="fileInput" type="file" accept=".sam,text/plain" multiple hidden />
           </div>
           <div class="toolbar-group">
             <button id="runBtn" class="primary" type="button" disabled>Run</button>
@@ -46,6 +53,11 @@
             <button id="resetBtn" type="button" disabled>Reset</button>
             <button id="stopBtn" type="button" disabled>Stop</button>
           </div>
+        </div>
+
+        <div class="tab-strip" aria-label="Open SaM files">
+          <div id="tabs" class="tabs" role="tablist"></div>
+          <button id="newTabBtn" class="new-tab-button" type="button" title="New file (Ctrl/Cmd+N)" aria-label="New file">+</button>
         </div>
 
         <div id="editor" class="editor-host"></div>
@@ -79,8 +91,74 @@
       </section>
     </main>
 
+    <div id="settingsPanel" class="settings-panel" hidden>
+      <div class="settings-heading">Editor settings</div>
+      <label>
+        <span>Theme</span>
+        <select id="themeSelect">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+          <option value="contrast">High contrast</option>
+        </select>
+      </label>
+      <label>
+        <span>Font size</span>
+        <div class="range-setting"><input id="fontSizeInput" type="range" min="11" max="24" step="1" /><output id="fontSizeOutput"></output></div>
+      </label>
+      <label>
+        <span>Font</span>
+        <select id="fontFamilySelect">
+          <option value="system-mono">System monospace</option>
+          <option value="menlo">Menlo / Consolas</option>
+          <option value="courier">Courier New</option>
+        </select>
+      </label>
+      <label>
+        <span>Tab width</span>
+        <select id="tabWidthSelect"><option value="2">2 spaces</option><option value="4">4 spaces</option><option value="8">8 spaces</option></select>
+      </label>
+      <label class="toggle-setting"><span>Line wrapping</span><input id="lineWrapInput" type="checkbox" /></label>
+      <label class="toggle-setting"><span>PC source highlight</span><input id="pcHighlightInput" type="checkbox" /></label>
+      <button id="aboutHelpBtn" class="settings-secondary-button" type="button">About / Help</button>
+      <button id="resetSettingsBtn" type="button">Reset settings</button>
+    </div>
+
+    <div id="helpModal" class="modal-backdrop" hidden>
+      <section class="help-modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+        <div class="modal-heading">
+          <div>
+            <h2 id="helpTitle">Welcome to SaM Web IDE</h2>
+            <p>Write SaM assembly in the browser and run it in the original SaM 2.6.3 simulator.</p>
+          </div>
+          <button id="helpCloseBtn" class="modal-close" type="button" aria-label="Close help">×</button>
+        </div>
+        <div class="help-content">
+          <div class="help-section">
+            <h3>Getting started</h3>
+            <p>Edit the active <code>.sam</code> file, then use <strong>Run</strong> or <strong>Step</strong>. Assembly errors are shown directly in the editor and the current program counter can follow the corresponding source line.</p>
+          </div>
+          <div class="help-grid">
+            <div><strong>Files</strong><span>Use New/Open for tabs. Download saves the active tab to your device.</span></div>
+            <div><strong>Share</strong><span>Share copies a URL containing the active program and filename. Opening the link creates a new tab; the source stays in the URL fragment.</span></div>
+            <div><strong>Autocomplete</strong><span>Start typing an instruction or press Ctrl/Cmd+Space. Labels in the current file are suggested too.</span></div>
+            <div><strong>Settings</strong><span>Use the gear for theme, font size, tab width, wrapping, and PC highlighting.</span></div>
+            <div><strong>Mobile</strong><span>On a phone, switch between Editor and Simulator using the view buttons above the workspace.</span></div>
+          </div>
+          <div class="help-section help-shortcuts">
+            <h3>Keyboard shortcuts</h3>
+            <p><kbd>Ctrl/Cmd+Enter</kbd> Run &nbsp; <kbd>F10</kbd> Step &nbsp; <kbd>Ctrl/Cmd+S</kbd> Download &nbsp; <kbd>Ctrl/Cmd+Space</kbd> Autocomplete</p>
+          </div>
+          <div class="help-note">Your open tabs and editor settings are stored locally in this browser.</div>
+        </div>
+        <div class="modal-actions">
+          <label class="dont-show-label"><input id="showHelpOnStartInput" type="checkbox" checked /> Show this help on first use</label>
+          <button id="helpDoneBtn" class="primary" type="button">Start coding</button>
+        </div>
+      </section>
+    </div>
+
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=editor-v9"></script>
+    <script src="./app.js?v=editor-v15"></script>
   </body>
 </html>

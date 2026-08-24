@@ -36,17 +36,41 @@ Requirements:
 - a JDK with `javac` and `jar` on `PATH`;
 - Java 8-compatible source/bytecode is used for the bridge.
 
-## Editor behavior
+## Editor workspace
 
-The browser toolbar is the primary workflow:
+The browser editor now supports multiple `.sam` files as tabs. **New** or the `+` tab button creates a new buffer, **Open** can open one or several `.sam` files as new tabs, and **Download** downloads the active tab. Each tab stores its own filename, source text, cursor position, scroll position, and dirty state. The complete workspace is restored from browser `localStorage` after a refresh.
 
-- **New**, **Open**, **Download** manage `.sam` source files;
-- **Run** always assembles/reloads the current editor buffer before running it;
-- **Step** automatically reloads first if the source changed;
-- **Reset** likewise uses the current buffer;
+The browser toolbar remains the primary execution workflow:
+
+- **Run** always assembles/reloads the active tab before running it;
+- **Step** automatically reloads first if that tab's source changed;
+- **Reset** likewise uses the active buffer;
 - **Stop** stops the running SaM program.
 
-The filename field in the upper-right controls both the downloaded filename and the name shown to SaM.
+The filename field in the upper-right renames the active tab and controls both the downloaded filename and the name shown to SaM. Closing a dirty tab asks before discarding changes that have not been downloaded. Existing single-buffer autosaves from earlier prototype versions are migrated into the first v13 tab.
+
+### Editor settings
+
+The gear menu stores editor preferences locally and supports:
+
+- Dark, Light, and High Contrast themes;
+- font sizes from 11–24 px;
+- several monospace font stacks;
+- tab widths of 2, 4, or 8 spaces;
+- line wrapping on/off;
+- current-PC source highlighting on/off.
+
+The editor/simulator split position is also remembered. Theme changes apply to the browser IDE; the original SaM Swing simulator retains its native appearance.
+
+### Keyboard shortcuts
+
+- **Ctrl/Cmd+N** — new tab
+- **Ctrl/Cmd+O** — open file(s)
+- **Ctrl/Cmd+S** — download active tab
+- **Ctrl/Cmd+W** — close active tab
+- **Ctrl/Cmd+Enter** — run active tab
+- **F10** — step
+- **Ctrl/Cmd+Space** — autocomplete
 
 ### Assembly diagnostics
 
@@ -150,3 +174,21 @@ Examples:
 - `https://example.com/sam-web-ide/` resolves them under `/app/sam-web-ide/jar/`.
 
 No hard-coded GitHub Pages repository name is required. If SaM fails to start, the simulator pane now shows the exact CheerpJ JAR paths it attempted to load.
+
+## v14 help and mobile layout
+
+On first use, the IDE presents a short help dialog describing the editor, simulator, autocomplete, files, and keyboard shortcuts. It can be reopened at any time from **Settings (gear) → About / Help**.
+
+On screens 900px wide or narrower, the desktop split view changes to a mobile workspace switcher with **Editor** and **Simulator** views. The selected mobile view is remembered locally. This avoids squeezing the Swing simulator and CodeMirror into two unusably narrow panes on phones and tablets.
+
+
+## Shareable program URLs
+
+Use **Share** in the editor toolbar to copy a URL containing the active `.sam`
+program and its filename. The program is encoded in the URL fragment (`#share=...`),
+so opening the link creates a new editor tab without requiring a backend or server-side
+storage. After import, the share fragment is removed from the address bar to avoid
+accidentally re-importing the program on refresh.
+
+Because the full source is carried in the URL, this is intended for normal small SaM
+examples and teaching exercises rather than very large files.
