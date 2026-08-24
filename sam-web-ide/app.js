@@ -78,23 +78,609 @@ function clearShareFragment() {
 
 const starterProgram = `// SaM Web IDE\n// Edit this program, then Run or Step.\n\nPUSHIMM 10\nPUSHIMM 20\nADD\nWRITE\nSTOP\n`;
 
-const instructionOperands = {
-  ADDSP: "int", JSR: "label", JUMP: "label", JUMPC: "label",
-  LSHIFT: "int", PUSHABS: "int", PUSHIMM: "int", PUSHIMMCH: "char",
-  PUSHIMMF: "float", PUSHIMMMA: "int", PUSHIMMPA: "label",
-  PUSHIMMSTR: "string", PUSHOFF: "int", RSHIFT: "int",
-  STOREABS: "int", STOREOFF: "int",
-};
-
-const opcodes = new Set(`
-ADD ADDF ADDSP AND BITAND BITNAND BITNOR BITNOT BITOR BITXOR
-CMP CMPF DIV DIVF DUP EQUAL FREE FTOI FTOIR GREATER ISNEG ISNIL ISPOS
-ITOF JSR JSRIND JUMP JUMPC JUMPIND LESS LINK LSHIFT LSHIFTIND MALLOC
-MOD NAND NOR NOT OR POPFBR POPSP PUSHABS PUSHFBR PUSHIMM PUSHIMMCH
-PUSHIMMF PUSHIMMMA PUSHIMMPA PUSHIMMSTR PUSHIND PUSHOFF PUSHSP READ
-READCH READF READSTR RSHIFT RSHIFTIND RST SKIP STOP STOREABS STOREIND
-STOREOFF SUB SUBF SWAP TIMES TIMESF UNLINK WRITE WRITECH WRITEF WRITESTR XOR
-`.trim().split(/\s+/));
+const ISA = Object.freeze({
+  "ADD": {
+    "signature": "ADD",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Pop two integers and push their sum.",
+    "stackEffect": "[..., a, b] \u2192 [..., a+b]",
+    "example": "ADD"
+  },
+  "ADDF": {
+    "signature": "ADDF",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Pop two floating-point values and push their sum.",
+    "stackEffect": "",
+    "example": "ADDF"
+  },
+  "ADDSP": {
+    "signature": "ADDSP int",
+    "operand": "int",
+    "category": "Stack & addressing",
+    "description": "Adjust the stack pointer by a signed integer offset.",
+    "stackEffect": "",
+    "example": "ADDSP 1"
+  },
+  "AND": {
+    "signature": "AND",
+    "operand": "",
+    "category": "Logic & bit operations",
+    "description": "Logical AND of the top two stack values.",
+    "stackEffect": "",
+    "example": "AND"
+  },
+  "BITAND": {
+    "signature": "BITAND",
+    "operand": "",
+    "category": "Logic & bit operations",
+    "description": "Bitwise AND of the top two integers.",
+    "stackEffect": "",
+    "example": "BITAND"
+  },
+  "BITNAND": {
+    "signature": "BITNAND",
+    "operand": "",
+    "category": "Logic & bit operations",
+    "description": "Bitwise NAND of the top two integers.",
+    "stackEffect": "",
+    "example": "BITNAND"
+  },
+  "BITNOR": {
+    "signature": "BITNOR",
+    "operand": "",
+    "category": "Logic & bit operations",
+    "description": "Bitwise NOR of the top two integers.",
+    "stackEffect": "",
+    "example": "BITNOR"
+  },
+  "BITNOT": {
+    "signature": "BITNOT",
+    "operand": "",
+    "category": "Logic & bit operations",
+    "description": "Bitwise complement of the top integer.",
+    "stackEffect": "",
+    "example": "BITNOT"
+  },
+  "BITOR": {
+    "signature": "BITOR",
+    "operand": "",
+    "category": "Logic & bit operations",
+    "description": "Bitwise OR of the top two integers.",
+    "stackEffect": "",
+    "example": "BITOR"
+  },
+  "BITXOR": {
+    "signature": "BITXOR",
+    "operand": "",
+    "category": "Logic & bit operations",
+    "description": "Bitwise XOR of the top two integers.",
+    "stackEffect": "",
+    "example": "BITXOR"
+  },
+  "CMP": {
+    "signature": "CMP",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Compare two integers and push a comparison result.",
+    "stackEffect": "",
+    "example": "CMP"
+  },
+  "CMPF": {
+    "signature": "CMPF",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Compare two floating-point values and push a comparison result.",
+    "stackEffect": "",
+    "example": "CMPF"
+  },
+  "DIV": {
+    "signature": "DIV",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Pop two integers and push their quotient.",
+    "stackEffect": "[..., a, b] \u2192 [..., a/b]",
+    "example": "DIV"
+  },
+  "DIVF": {
+    "signature": "DIVF",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Pop two floating-point values and push their quotient.",
+    "stackEffect": "",
+    "example": "DIVF"
+  },
+  "DUP": {
+    "signature": "DUP",
+    "operand": "",
+    "category": "Stack & addressing",
+    "description": "Duplicate the top stack value.",
+    "stackEffect": "[..., a] \u2192 [..., a, a]",
+    "example": "DUP"
+  },
+  "EQUAL": {
+    "signature": "EQUAL",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Push true when the top two values are equal.",
+    "stackEffect": "",
+    "example": "EQUAL"
+  },
+  "FREE": {
+    "signature": "FREE",
+    "operand": "",
+    "category": "Memory",
+    "description": "Release a heap block whose address is on the stack.",
+    "stackEffect": "",
+    "example": "FREE"
+  },
+  "FTOI": {
+    "signature": "FTOI",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Convert the top floating-point value to an integer.",
+    "stackEffect": "",
+    "example": "FTOI"
+  },
+  "FTOIR": {
+    "signature": "FTOIR",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Convert the top floating-point value to an integer using rounding.",
+    "stackEffect": "",
+    "example": "FTOIR"
+  },
+  "GREATER": {
+    "signature": "GREATER",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Push true when the first operand is greater than the second.",
+    "stackEffect": "",
+    "example": "GREATER"
+  },
+  "ISNEG": {
+    "signature": "ISNEG",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Push true when the top integer is negative.",
+    "stackEffect": "",
+    "example": "ISNEG"
+  },
+  "ISNIL": {
+    "signature": "ISNIL",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Push true when the top value is nil/zero.",
+    "stackEffect": "",
+    "example": "ISNIL"
+  },
+  "ISPOS": {
+    "signature": "ISPOS",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Push true when the top integer is positive.",
+    "stackEffect": "",
+    "example": "ISPOS"
+  },
+  "ITOF": {
+    "signature": "ITOF",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Convert the top integer to floating point.",
+    "stackEffect": "",
+    "example": "ITOF"
+  },
+  "JSR": {
+    "signature": "JSR label",
+    "operand": "label",
+    "category": "Control flow",
+    "description": "Call a subroutine at the target label/address.",
+    "stackEffect": "",
+    "example": "JSR target"
+  },
+  "JSRIND": {
+    "signature": "JSRIND",
+    "operand": "",
+    "category": "Control flow",
+    "description": "Call a subroutine whose address is obtained indirectly from the stack.",
+    "stackEffect": "",
+    "example": "JSRIND"
+  },
+  "JUMP": {
+    "signature": "JUMP label",
+    "operand": "label",
+    "category": "Control flow",
+    "description": "Continue execution at the target label/address.",
+    "stackEffect": "",
+    "example": "JUMP target"
+  },
+  "JUMPC": {
+    "signature": "JUMPC label",
+    "operand": "label",
+    "category": "Control flow",
+    "description": "Conditionally jump to the target label/address using the stack condition.",
+    "stackEffect": "",
+    "example": "JUMPC target"
+  },
+  "JUMPIND": {
+    "signature": "JUMPIND",
+    "operand": "",
+    "category": "Control flow",
+    "description": "Jump to an address obtained indirectly from the stack.",
+    "stackEffect": "",
+    "example": "JUMPIND"
+  },
+  "LESS": {
+    "signature": "LESS",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Push true when the first operand is less than the second.",
+    "stackEffect": "",
+    "example": "LESS"
+  },
+  "LINK": {
+    "signature": "LINK",
+    "operand": "",
+    "category": "Control flow",
+    "description": "Create a stack frame and establish the frame-base register.",
+    "stackEffect": "",
+    "example": "LINK"
+  },
+  "LSHIFT": {
+    "signature": "LSHIFT int",
+    "operand": "int",
+    "category": "Logic & bit operations",
+    "description": "Left-shift the top integer by the immediate amount.",
+    "stackEffect": "",
+    "example": "LSHIFT 1"
+  },
+  "LSHIFTIND": {
+    "signature": "LSHIFTIND",
+    "operand": "",
+    "category": "Logic & bit operations",
+    "description": "Left-shift using a shift amount taken indirectly from the stack.",
+    "stackEffect": "",
+    "example": "LSHIFTIND"
+  },
+  "MALLOC": {
+    "signature": "MALLOC",
+    "operand": "",
+    "category": "Memory",
+    "description": "Allocate heap storage and push the resulting address.",
+    "stackEffect": "",
+    "example": "MALLOC"
+  },
+  "MOD": {
+    "signature": "MOD",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Pop two integers and push the remainder.",
+    "stackEffect": "[..., a, b] \u2192 [..., a mod b]",
+    "example": "MOD"
+  },
+  "NAND": {
+    "signature": "NAND",
+    "operand": "",
+    "category": "Logic & bit operations",
+    "description": "Logical NAND of the top two stack values.",
+    "stackEffect": "",
+    "example": "NAND"
+  },
+  "NOR": {
+    "signature": "NOR",
+    "operand": "",
+    "category": "Logic & bit operations",
+    "description": "Logical NOR of the top two stack values.",
+    "stackEffect": "",
+    "example": "NOR"
+  },
+  "NOT": {
+    "signature": "NOT",
+    "operand": "",
+    "category": "Logic & bit operations",
+    "description": "Logical negation of the top stack value.",
+    "stackEffect": "[..., a] \u2192 [..., !a]",
+    "example": "NOT"
+  },
+  "OR": {
+    "signature": "OR",
+    "operand": "",
+    "category": "Logic & bit operations",
+    "description": "Logical OR of the top two stack values.",
+    "stackEffect": "",
+    "example": "OR"
+  },
+  "POPFBR": {
+    "signature": "POPFBR",
+    "operand": "",
+    "category": "Stack & addressing",
+    "description": "Pop the top value into the frame-base register.",
+    "stackEffect": "",
+    "example": "POPFBR"
+  },
+  "POPSP": {
+    "signature": "POPSP",
+    "operand": "",
+    "category": "Stack & addressing",
+    "description": "Set the stack pointer from the top stack value.",
+    "stackEffect": "",
+    "example": "POPSP"
+  },
+  "PUSHABS": {
+    "signature": "PUSHABS int",
+    "operand": "int",
+    "category": "Stack & addressing",
+    "description": "Push the value stored at an absolute memory address.",
+    "stackEffect": "",
+    "example": "PUSHABS 1"
+  },
+  "PUSHFBR": {
+    "signature": "PUSHFBR",
+    "operand": "",
+    "category": "Stack & addressing",
+    "description": "Push the current frame-base register.",
+    "stackEffect": "",
+    "example": "PUSHFBR"
+  },
+  "PUSHIMM": {
+    "signature": "PUSHIMM int",
+    "operand": "int",
+    "category": "Stack & addressing",
+    "description": "Push an immediate integer constant.",
+    "stackEffect": "[...] \u2192 [..., n]",
+    "example": "PUSHIMM 1"
+  },
+  "PUSHIMMCH": {
+    "signature": "PUSHIMMCH char",
+    "operand": "char",
+    "category": "Stack & addressing",
+    "description": "Push an immediate character literal.",
+    "stackEffect": "[...] \u2192 [..., ch]",
+    "example": "PUSHIMMCH 'A'"
+  },
+  "PUSHIMMF": {
+    "signature": "PUSHIMMF float",
+    "operand": "float",
+    "category": "Stack & addressing",
+    "description": "Push an immediate floating-point constant.",
+    "stackEffect": "[...] \u2192 [..., f]",
+    "example": "PUSHIMMF 1.0"
+  },
+  "PUSHIMMMA": {
+    "signature": "PUSHIMMMA int",
+    "operand": "int",
+    "category": "Stack & addressing",
+    "description": "Push an immediate memory address.",
+    "stackEffect": "",
+    "example": "PUSHIMMMA 1"
+  },
+  "PUSHIMMPA": {
+    "signature": "PUSHIMMPA label",
+    "operand": "label",
+    "category": "Stack & addressing",
+    "description": "Push an immediate program address (usually a label).",
+    "stackEffect": "",
+    "example": "PUSHIMMPA target"
+  },
+  "PUSHIMMSTR": {
+    "signature": "PUSHIMMSTR string",
+    "operand": "string",
+    "category": "Stack & addressing",
+    "description": "Push an immediate string literal.",
+    "stackEffect": "",
+    "example": "PUSHIMMSTR \"text\""
+  },
+  "PUSHIND": {
+    "signature": "PUSHIND",
+    "operand": "",
+    "category": "Stack & addressing",
+    "description": "Push a value obtained through an indirect address.",
+    "stackEffect": "",
+    "example": "PUSHIND"
+  },
+  "PUSHOFF": {
+    "signature": "PUSHOFF int",
+    "operand": "int",
+    "category": "Stack & addressing",
+    "description": "Push a value at an offset from the frame-base register.",
+    "stackEffect": "",
+    "example": "PUSHOFF 1"
+  },
+  "PUSHSP": {
+    "signature": "PUSHSP",
+    "operand": "",
+    "category": "Stack & addressing",
+    "description": "Push the current stack pointer.",
+    "stackEffect": "",
+    "example": "PUSHSP"
+  },
+  "READ": {
+    "signature": "READ",
+    "operand": "",
+    "category": "Input / output",
+    "description": "Read an integer from input and push it.",
+    "stackEffect": "",
+    "example": "READ"
+  },
+  "READCH": {
+    "signature": "READCH",
+    "operand": "",
+    "category": "Input / output",
+    "description": "Read a character from input and push it.",
+    "stackEffect": "",
+    "example": "READCH"
+  },
+  "READF": {
+    "signature": "READF",
+    "operand": "",
+    "category": "Input / output",
+    "description": "Read a floating-point value from input and push it.",
+    "stackEffect": "",
+    "example": "READF"
+  },
+  "READSTR": {
+    "signature": "READSTR",
+    "operand": "",
+    "category": "Input / output",
+    "description": "Read a string from input.",
+    "stackEffect": "",
+    "example": "READSTR"
+  },
+  "RSHIFT": {
+    "signature": "RSHIFT int",
+    "operand": "int",
+    "category": "Logic & bit operations",
+    "description": "Right-shift the top integer by the immediate amount.",
+    "stackEffect": "",
+    "example": "RSHIFT 1"
+  },
+  "RSHIFTIND": {
+    "signature": "RSHIFTIND",
+    "operand": "",
+    "category": "Logic & bit operations",
+    "description": "Right-shift using a shift amount taken indirectly from the stack.",
+    "stackEffect": "",
+    "example": "RSHIFTIND"
+  },
+  "RST": {
+    "signature": "RST",
+    "operand": "",
+    "category": "Control flow",
+    "description": "Restore machine state associated with a subroutine return.",
+    "stackEffect": "",
+    "example": "RST"
+  },
+  "SKIP": {
+    "signature": "SKIP",
+    "operand": "",
+    "category": "Control flow",
+    "description": "Advance execution past the next instruction.",
+    "stackEffect": "",
+    "example": "SKIP"
+  },
+  "STOP": {
+    "signature": "STOP",
+    "operand": "",
+    "category": "Control flow",
+    "description": "Halt execution.",
+    "stackEffect": "stack unchanged",
+    "example": "STOP"
+  },
+  "STOREABS": {
+    "signature": "STOREABS int",
+    "operand": "int",
+    "category": "Memory",
+    "description": "Store the top value at an absolute memory address.",
+    "stackEffect": "",
+    "example": "STOREABS 1"
+  },
+  "STOREIND": {
+    "signature": "STOREIND",
+    "operand": "",
+    "category": "Memory",
+    "description": "Store a value through an indirect address.",
+    "stackEffect": "",
+    "example": "STOREIND"
+  },
+  "STOREOFF": {
+    "signature": "STOREOFF int",
+    "operand": "int",
+    "category": "Memory",
+    "description": "Store a value at an offset from the frame-base register.",
+    "stackEffect": "",
+    "example": "STOREOFF 1"
+  },
+  "SUB": {
+    "signature": "SUB",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Pop two integers and push their difference.",
+    "stackEffect": "[..., a, b] \u2192 [..., a-b]",
+    "example": "SUB"
+  },
+  "SUBF": {
+    "signature": "SUBF",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Pop two floating-point values and push their difference.",
+    "stackEffect": "",
+    "example": "SUBF"
+  },
+  "SWAP": {
+    "signature": "SWAP",
+    "operand": "",
+    "category": "Stack & addressing",
+    "description": "Exchange the top two stack values.",
+    "stackEffect": "[..., a, b] \u2192 [..., b, a]",
+    "example": "SWAP"
+  },
+  "TIMES": {
+    "signature": "TIMES",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Pop two integers and push their product.",
+    "stackEffect": "[..., a, b] \u2192 [..., a*b]",
+    "example": "TIMES"
+  },
+  "TIMESF": {
+    "signature": "TIMESF",
+    "operand": "",
+    "category": "Arithmetic & comparison",
+    "description": "Pop two floating-point values and push their product.",
+    "stackEffect": "",
+    "example": "TIMESF"
+  },
+  "UNLINK": {
+    "signature": "UNLINK",
+    "operand": "",
+    "category": "Control flow",
+    "description": "Tear down the current stack frame.",
+    "stackEffect": "",
+    "example": "UNLINK"
+  },
+  "WRITE": {
+    "signature": "WRITE",
+    "operand": "",
+    "category": "Input / output",
+    "description": "Write the top integer value to output.",
+    "stackEffect": "",
+    "example": "WRITE"
+  },
+  "WRITECH": {
+    "signature": "WRITECH",
+    "operand": "",
+    "category": "Input / output",
+    "description": "Write the top value as a character.",
+    "stackEffect": "",
+    "example": "WRITECH"
+  },
+  "WRITEF": {
+    "signature": "WRITEF",
+    "operand": "",
+    "category": "Input / output",
+    "description": "Write the top floating-point value to output.",
+    "stackEffect": "",
+    "example": "WRITEF"
+  },
+  "WRITESTR": {
+    "signature": "WRITESTR",
+    "operand": "",
+    "category": "Input / output",
+    "description": "Write a string to output.",
+    "stackEffect": "",
+    "example": "WRITESTR"
+  },
+  "XOR": {
+    "signature": "XOR",
+    "operand": "",
+    "category": "Logic & bit operations",
+    "description": "Logical exclusive OR of the top two stack values.",
+    "stackEffect": "",
+    "example": "XOR"
+  }
+});
+const opcodes = new Set(Object.keys(ISA));
 
 const operandDescriptions = {
   int: "integer operand",
@@ -105,13 +691,14 @@ const operandDescriptions = {
 };
 
 function instructionCompletion(opcode) {
-  const operand = instructionOperands[opcode] || "";
+  const meta = ISA[opcode];
+  const operand = meta.operand || "";
   return {
     text: opcode,
     insertText: operand ? `${opcode} ` : opcode,
     kind: "instruction",
-    signature: operand ? `${opcode} ${operand}` : opcode,
-    detail: operand ? operandDescriptions[operand] : "no operands",
+    signature: meta.signature,
+    detail: meta.description,
     operand,
   };
 }
@@ -202,7 +789,7 @@ function loadWorkspace() {
 }
 const defaultSettings = {
   theme: "dark", fontSize: 14, fontFamily: "system-mono",
-  tabWidth: 2, lineWrapping: true, pcHighlight: true,
+  tabWidth: 2, lineWrapping: true, pcHighlight: true, autocomplete: true,
 };
 function loadSettings() {
   try { return { ...defaultSettings, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") }; }
@@ -222,6 +809,13 @@ const fontFamilySelect = document.querySelector("#fontFamilySelect");
 const tabWidthSelect = document.querySelector("#tabWidthSelect");
 const lineWrapInput = document.querySelector("#lineWrapInput");
 const pcHighlightInput = document.querySelector("#pcHighlightInput");
+const autocompleteInput = document.querySelector("#autocompleteInput");
+const isaReferenceBtn = document.querySelector("#isaReferenceBtn");
+const isaModal = document.querySelector("#isaModal");
+const isaCloseBtn = document.querySelector("#isaCloseBtn");
+const isaSearchInput = document.querySelector("#isaSearchInput");
+const isaCategorySelect = document.querySelector("#isaCategorySelect");
+const isaResults = document.querySelector("#isaResults");
 const aboutHelpBtn = document.querySelector("#aboutHelpBtn");
 const helpModal = document.querySelector("#helpModal");
 const helpCloseBtn = document.querySelector("#helpCloseBtn");
@@ -267,6 +861,7 @@ function applySettings({ refresh = true } = {}) {
   tabWidthSelect.value = String(editorSettings.tabWidth);
   lineWrapInput.checked = !!editorSettings.lineWrapping;
   pcHighlightInput.checked = !!editorSettings.pcHighlight;
+  autocompleteInput.checked = editorSettings.autocomplete !== false;
   if (!editorSettings.pcHighlight && executionLine !== null) editor.removeLineClass(executionLine, "text", "sam-current-instruction-text");
   if (refresh) setTimeout(() => editor.refresh(), 0);
 }
@@ -425,13 +1020,14 @@ function renderCompletions() {
 }
 
 function showCompletions({ explicit = false } = {}) {
+  if (editorSettings.autocomplete === false) { hideCompletions(); return; }
   const { cursor, start, text } = completionToken();
   if (!explicit && text.length < 2) { hideCompletions(); return; }
   const prefix = text.toUpperCase();
   const lineBeforeToken = editor.getLine(cursor.line).slice(0, start);
   const opcodeMatch = lineBeforeToken.match(/^\s*([A-Za-z]+)\s+$/);
   const argumentOpcode = opcodeMatch ? opcodeMatch[1].toUpperCase() : null;
-  const expectedOperand = argumentOpcode ? instructionOperands[argumentOpcode] : null;
+  const expectedOperand = argumentOpcode ? ISA[argumentOpcode]?.operand : null;
 
   const opcodeItems = expectedOperand ? [] : [...opcodes]
     .filter(op => !prefix || op.startsWith(prefix))
@@ -797,6 +1393,124 @@ stopBtn.addEventListener("click", async () => {
 document.querySelector("#diagnosticClose").addEventListener("click", clearDiagnostics);
 
 
+
+function isaCategories() {
+  return [...new Set(Object.values(ISA).map(item => item.category))].sort();
+}
+
+function renderISAReference() {
+  const query = (isaSearchInput.value || "").trim().toLowerCase();
+  const category = isaCategorySelect.value;
+  const entries = Object.entries(ISA)
+    .filter(([opcode, meta]) => {
+      if (category && meta.category !== category) return false;
+      if (!query) return true;
+      return [opcode, meta.signature, meta.description, meta.category, meta.stackEffect]
+        .some(value => (value || "").toLowerCase().includes(query));
+    })
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  isaResults.replaceChildren();
+  if (!entries.length) {
+    const empty = document.createElement("div");
+    empty.className = "isa-empty";
+    empty.textContent = "No instructions match that search.";
+    isaResults.appendChild(empty);
+    return;
+  }
+
+  for (const [opcode, meta] of entries) {
+    const card = document.createElement("article");
+    card.className = "isa-card";
+    card.innerHTML = `
+      <div class="isa-card-heading">
+        <code class="isa-signature"></code>
+        <span class="isa-category"></span>
+      </div>
+      <p class="isa-description"></p>
+      <div class="isa-meta" hidden></div>
+      <pre class="isa-example"></pre>`;
+    card.querySelector(".isa-signature").textContent = meta.signature;
+    card.querySelector(".isa-category").textContent = meta.category;
+    card.querySelector(".isa-description").textContent = meta.description;
+    const metaEl = card.querySelector(".isa-meta");
+    if (meta.stackEffect) {
+      metaEl.hidden = false;
+      metaEl.textContent = `Stack: ${meta.stackEffect}`;
+    }
+    card.querySelector(".isa-example").textContent = meta.example;
+    isaResults.appendChild(card);
+  }
+}
+
+function openISAReference() {
+  settingsPanel.hidden = true;
+  settingsBtn.setAttribute("aria-expanded", "false");
+  isaModal.hidden = false;
+  isaSearchInput.value = "";
+  isaCategorySelect.value = "";
+  renderISAReference();
+  setTimeout(() => isaSearchInput.focus(), 0);
+}
+
+function closeISAReference() {
+  isaModal.hidden = true;
+  editor.refresh();
+}
+
+const hoverDoc = document.createElement("div");
+hoverDoc.className = "sam-hover-doc";
+hoverDoc.hidden = true;
+document.body.appendChild(hoverDoc);
+let hoverDocTimer = null;
+
+function hideHoverDoc() {
+  clearTimeout(hoverDocTimer);
+  hoverDoc.hidden = true;
+}
+
+editor.getWrapperElement().addEventListener("mousemove", event => {
+  if (completionPopup && !completionPopup.hidden) { hideHoverDoc(); return; }
+  const pos = editor.coordsChar({ left: event.clientX, top: event.clientY }, "window");
+  const token = editor.getTokenAt(pos);
+  const opcode = (token.string || "").trim().toUpperCase();
+  const meta = ISA[opcode];
+  if (!meta) { hideHoverDoc(); return; }
+  clearTimeout(hoverDocTimer);
+  hoverDocTimer = setTimeout(() => {
+    hoverDoc.replaceChildren();
+    const sig = document.createElement("code");
+    sig.textContent = meta.signature;
+    const description = document.createElement("div");
+    description.textContent = meta.description;
+    hoverDoc.append(sig, description);
+    if (meta.stackEffect) {
+      const effect = document.createElement("div");
+      effect.className = "hover-stack";
+      effect.textContent = `Stack: ${meta.stackEffect}`;
+      hoverDoc.appendChild(effect);
+    }
+    hoverDoc.style.left = `${Math.min(event.pageX + 12, window.innerWidth - 340)}px`;
+    hoverDoc.style.top = `${event.pageY + 16}px`;
+    hoverDoc.hidden = false;
+  }, 350);
+});
+editor.getWrapperElement().addEventListener("mouseleave", hideHoverDoc);
+editor.on("scroll", hideHoverDoc);
+
+for (const category of isaCategories()) {
+  const option = document.createElement("option");
+  option.value = category;
+  option.textContent = category;
+  isaCategorySelect.appendChild(option);
+}
+isaSearchInput.addEventListener("input", renderISAReference);
+isaCategorySelect.addEventListener("change", renderISAReference);
+isaReferenceBtn.addEventListener("click", openISAReference);
+isaCloseBtn.addEventListener("click", closeISAReference);
+isaModal.addEventListener("click", event => { if (event.target === isaModal) closeISAReference(); });
+
+
 function openHelp() {
   settingsPanel.hidden = true;
   settingsBtn.setAttribute("aria-expanded", "false");
@@ -869,6 +1583,7 @@ fontFamilySelect.addEventListener("change", () => setSetting("fontFamily", fontF
 tabWidthSelect.addEventListener("change", () => setSetting("tabWidth", Number(tabWidthSelect.value)));
 lineWrapInput.addEventListener("change", () => setSetting("lineWrapping", lineWrapInput.checked));
 pcHighlightInput.addEventListener("change", () => setSetting("pcHighlight", pcHighlightInput.checked));
+autocompleteInput.addEventListener("change", () => { setSetting("autocomplete", autocompleteInput.checked); if (!autocompleteInput.checked) hideCompletions(); });
 document.querySelector("#resetSettingsBtn").addEventListener("click", () => {
   editorSettings = { ...defaultSettings }; persistSettings(); applySettings(); notify("Editor settings reset.");
 });
@@ -884,6 +1599,7 @@ document.addEventListener("keydown", event => {
   if (mod && key === "w") { event.preventDefault(); closeTab(); return; }
   if (mod && event.key === "Enter") { event.preventDefault(); if (!runBtn.disabled) runBtn.click(); return; }
   if (event.key === "F10") { event.preventDefault(); if (!stepBtn.disabled) stepBtn.click(); return; }
+  if (event.key === "Escape" && !isaModal.hidden) { event.preventDefault(); closeISAReference(); return; }
   if (event.key === "Escape" && !helpModal.hidden) { event.preventDefault(); closeHelp(); }
 });
 

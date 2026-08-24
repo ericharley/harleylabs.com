@@ -609,3 +609,156 @@ execution-marker {
   .modal-actions .primary { width: 100%; }
   .editor-footer span:last-child { display: none; }
 }
+
+
+/* ISA reference and contextual instruction documentation */
+.isa-modal {
+  width: min(920px, calc(100vw - 32px));
+  max-height: min(86vh, 820px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+}
+
+.isa-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
+  gap: 10px;
+  padding: 0 18px 14px;
+}
+
+.isa-toolbar input,
+.isa-toolbar select {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 7px 10px;
+  font: inherit;
+}
+
+.isa-results {
+  overflow: auto;
+  padding: 0 18px 20px;
+  display: grid;
+  gap: 10px;
+}
+
+.isa-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--surface);
+}
+
+.isa-card-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.isa-signature {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.isa-category {
+  font-size: 0.75rem;
+  opacity: 0.72;
+  text-align: right;
+}
+
+.isa-description {
+  margin: 7px 0 6px;
+  line-height: 1.45;
+}
+
+.isa-meta {
+  font-family: var(--editor-font-family);
+  font-size: 0.82rem;
+  opacity: 0.8;
+  margin-bottom: 7px;
+}
+
+.isa-example {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 7px;
+  overflow-x: auto;
+  background: var(--editor-bg, rgba(127,127,127,.08));
+  color: var(--text);
+  font-family: var(--editor-font-family);
+  font-size: 0.83rem;
+}
+
+.isa-empty {
+  padding: 36px 12px;
+  text-align: center;
+  opacity: 0.7;
+}
+
+.sam-hover-doc {
+  position: absolute;
+  z-index: 10020;
+  width: min(320px, calc(100vw - 24px));
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 9px 11px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 12px 36px rgba(0,0,0,.32);
+  pointer-events: none;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.sam-hover-doc code {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.sam-hover-doc .hover-stack {
+  margin-top: 5px;
+  opacity: .76;
+  font-family: var(--editor-font-family);
+  font-size: .78rem;
+}
+
+@media (max-width: 700px) {
+  .isa-modal {
+    width: calc(100vw - 16px);
+    max-height: 92vh;
+  }
+
+  .isa-toolbar {
+    grid-template-columns: 1fr;
+    padding-inline: 12px;
+  }
+
+  .isa-results {
+    padding-inline: 12px;
+  }
+
+  .isa-card-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .isa-category {
+    text-align: left;
+  }
+
+  .sam-hover-doc {
+    display: none !important;
+  }
+}

@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark light" />
     <title>SaM Web IDE</title>
     <link rel="stylesheet" href="./vendor/codemirror/codemirror.css" />
-    <link rel="stylesheet" href="./styles.css?v=editor-v15" />
+    <link rel="stylesheet" href="./styles.css?v=editor-v16" />
     <script src="./vendor/codemirror/codemirror.js"></script>
     <script src="./vendor/codemirror/addon/selection/active-line.js"></script>
     <script src="./vendor/codemirror/addon/edit/matchbrackets.js"></script>
@@ -119,8 +119,30 @@
       </label>
       <label class="toggle-setting"><span>Line wrapping</span><input id="lineWrapInput" type="checkbox" /></label>
       <label class="toggle-setting"><span>PC source highlight</span><input id="pcHighlightInput" type="checkbox" /></label>
+      <label class="toggle-setting"><span>Autocomplete</span><input id="autocompleteInput" type="checkbox" checked /></label>
+      <button id="isaReferenceBtn" class="settings-secondary-button" type="button">ISA Reference</button>
       <button id="aboutHelpBtn" class="settings-secondary-button" type="button">About / Help</button>
       <button id="resetSettingsBtn" type="button">Reset settings</button>
+    </div>
+
+
+    <div id="isaModal" class="modal-backdrop" hidden>
+      <section class="isa-modal" role="dialog" aria-modal="true" aria-labelledby="isaTitle">
+        <div class="modal-heading">
+          <div>
+            <h2 id="isaTitle">SaM 2.6.3 ISA Reference</h2>
+            <p>Search the instruction set by opcode, operand, category, or description.</p>
+          </div>
+          <button id="isaCloseBtn" class="modal-close" type="button" aria-label="Close ISA reference">×</button>
+        </div>
+        <div class="isa-toolbar">
+          <input id="isaSearchInput" type="search" placeholder="Search instructions…" autocomplete="off" spellcheck="false" aria-label="Search ISA" />
+          <select id="isaCategorySelect" aria-label="Filter by instruction category">
+            <option value="">All categories</option>
+          </select>
+        </div>
+        <div id="isaResults" class="isa-results"></div>
+      </section>
     </div>
 
     <div id="helpModal" class="modal-backdrop" hidden>
@@ -140,7 +162,8 @@
           <div class="help-grid">
             <div><strong>Files</strong><span>Use New/Open for tabs. Download saves the active tab to your device.</span></div>
             <div><strong>Share</strong><span>Share copies a URL containing the active program and filename. Opening the link creates a new tab; the source stays in the URL fragment.</span></div>
-            <div><strong>Autocomplete</strong><span>Start typing an instruction or press Ctrl/Cmd+Space. Labels in the current file are suggested too.</span></div>
+            <div><strong>Autocomplete</strong><span>Start typing an instruction or press Ctrl/Cmd+Space. Labels in the current file are suggested too. You can disable autocomplete in Settings.</span></div>
+            <div><strong>ISA reference</strong><span>Open Settings → ISA Reference to search every SaM instruction. Hover an opcode in the editor for quick documentation.</span></div>
             <div><strong>Settings</strong><span>Use the gear for theme, font size, tab width, wrapping, and PC highlighting.</span></div>
             <div><strong>Mobile</strong><span>On a phone, switch between Editor and Simulator using the view buttons above the workspace.</span></div>
           </div>
@@ -159,6 +182,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=editor-v15"></script>
+    <script src="./app.js?v=editor-v16"></script>
   </body>
 </html>

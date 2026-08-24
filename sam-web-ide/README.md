@@ -192,3 +192,14 @@ accidentally re-importing the program on refresh.
 
 Because the full source is carried in the URL, this is intended for normal small SaM
 examples and teaching exercises rather than very large files.
+
+
+## ISA documentation
+
+v16 uses one canonical in-browser metadata database for all SaM 2.6.3 opcodes.
+That database drives syntax recognition, autocomplete signatures/descriptions, hover
+documentation, and the searchable **Settings → ISA Reference** dialog. The reference
+can be searched by opcode, category, operand/signature, or descriptive text.
+
+Autocomplete is enabled by default and can be disabled with **Settings → Autocomplete**.
+The preference is saved with the other editor settings.
