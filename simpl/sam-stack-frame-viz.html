@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SaM Stack Frame Visualizer</title>
+<style>
+:root{
+  --bg:#0f1115;--panel:#171a21;--panel2:#1e222b;--border:#343a46;
+  --text:#eef2f7;--muted:#9ca7b8;--accent:#7aa2f7;--good:#9ece6a;
+  --warn:#e0af68;--bad:#f7768e;--purple:#bb9af7;
+  --f1:#21304a;--f2:#293b2c;--f3:#3b2c3d;--f4:#3c3525;--f5:#28363f;--f6:#332f45;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+h1{margin:0;font-size:1.2rem}.subtitle{color:var(--muted);font-size:.86rem;margin-top:4px}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button,select{min-height:40px;padding:8px 11px;color:var(--text);background:var(--panel2);border:1px solid var(--border);border-radius:8px;font-size:.88rem}
+button{cursor:pointer}button:hover:not(:disabled){border-color:var(--accent)}button:disabled{opacity:.4;cursor:default}.primary{background:#263a67;border-color:#4568ad}
+main{padding:12px;display:grid;grid-template-columns:minmax(360px,.98fr) minmax(430px,1.18fr) minmax(300px,.84fr);gap:12px;align-items:start}
+.panel{min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.panel h2{margin:0;padding:9px 12px;background:var(--panel2);border-bottom:1px solid var(--border);font-size:.93rem}
+.panel-body{padding:10px}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:9px}
+.toolbar label{font-size:.76rem;color:var(--muted)}
+.code{max-height:660px;overflow:auto;font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;font-size:.75rem;line-height:1.5}
+.code-line{display:grid;grid-template-columns:34px 20px minmax(0,1fr);gap:5px;padding:1px 6px;border-left:3px solid transparent}
+.code-line .ln{color:#687386;text-align:right;user-select:none}.code-line .pc{color:var(--muted);text-align:right;user-select:none}.code-line .txt{white-space:pre}
+.code-line.comment .txt{color:var(--muted)}.code-line.comment .txt::selection{background:rgba(122,162,247,.25)}.code-line.label .txt{color:var(--warn);font-weight:700}
+.code-line.next{background:rgba(122,162,247,.14);border-left-color:var(--accent)}.code-line.next .txt{font-weight:700;color:white}
+.code-line.last .txt{color:var(--good)}
+.semantics{margin-top:9px;padding:9px;border:1px solid var(--border);border-radius:8px;background:#141821;font-size:.76rem;line-height:1.45}
+.sem-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 8px;margin-top:6px}.sem-grid div:nth-child(odd){color:var(--muted)}
+.stack-topline{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:.72rem;margin-bottom:7px}
+.stack-layout{display:grid;grid-template-columns:minmax(200px,.76fr) minmax(220px,1fr);gap:10px}
+.raw-zone{position:relative;padding-top:28px}
+.stack-arrow{position:absolute;left:0;right:0;top:0;text-align:center;color:var(--accent);font-size:.74rem;font-weight:700}
+.stack-column{min-height:500px;display:flex;flex-direction:column;justify-content:flex-end;padding-left:34px;position:relative;overflow:visible}
+.cells{display:flex;flex-direction:column;position:relative;z-index:1}
+.cell{display:grid;grid-template-columns:48px minmax(0,1fr) 42px;border:1px solid var(--border);border-bottom:none;min-height:28px;font: .7rem "SFMono-Regular",Consolas,monospace;position:relative;z-index:1}
+.cell:last-child{border-bottom:1px solid var(--border)}.addr{padding:5px;color:var(--muted);border-right:1px solid var(--border);text-align:right}.value{padding:5px 7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mark{padding:5px 3px;text-align:center;font-weight:700;color:var(--accent)}
+.cell.read{box-shadow:inset 0 0 0 2px var(--warn)}.cell.write{box-shadow:inset 0 0 0 2px var(--good)}.cell.pop{opacity:.55}
+.cell.f1{background:var(--f1)}.cell.f2{background:var(--f2)}.cell.f3{background:var(--f3)}.cell.f4{background:var(--f4)}.cell.f5{background:var(--f5)}.cell.f6{background:var(--f6)}
+.marker{position:absolute;left:0;font:700 .68rem "SFMono-Regular",Consolas,monospace;padding:2px 5px;border-radius:5px;white-space:nowrap;z-index:50;pointer-events:none;background:rgba(15,17,21,.92)}
+.marker.fbr{color:var(--accent);border:1px solid var(--accent)}.marker.sp{color:var(--good);border:1px solid var(--good)}
+.frames{min-height:500px;display:flex;flex-direction:column;justify-content:flex-start;gap:8px}
+.frame{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#141821}.frame.current{border:2px solid var(--accent)}
+.frame-title{padding:6px 8px;background:var(--panel2);display:flex;justify-content:space-between;gap:6px;font-size:.78rem;font-weight:700}.badge{font-size:.64rem;color:var(--accent)}
+.frame table{width:100%;border-collapse:collapse;font:.69rem "SFMono-Regular",Consolas,monospace}.frame td{border-top:1px solid var(--border);padding:4px 6px}.frame td:first-child{width:60px;color:var(--muted)}
+.call-tree{font:.79rem/1.7 "SFMono-Regular",Consolas,monospace}.call-node.current{color:var(--accent);font-weight:700}
+.phase{display:inline-block;margin-top:8px;padding:3px 7px;border-radius:999px;border:1px solid var(--border);font-size:.67rem;color:var(--warn)}
+.explain{margin-top:10px;padding:9px;background:#141821;border:1px solid var(--border);border-radius:8px;font-size:.82rem;line-height:1.45}
+.kv{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:4px 9px;font-size:.75rem}.kv div:nth-child(odd){color:var(--muted)}
+.history{margin-top:10px;border-top:1px solid var(--border);padding-top:8px}.history-title{font-size:.72rem;color:var(--muted);margin-bottom:5px}
+.crumbs{display:flex;gap:5px;flex-wrap:wrap}.crumb{font:.67rem "SFMono-Regular",Consolas,monospace;border:1px solid var(--border);border-radius:6px;padding:3px 5px;color:var(--muted);background:#141821}.crumb.current{border-color:var(--accent);color:var(--accent)}
+.legend{margin-top:10px;padding-top:8px;border-top:1px solid var(--border);color:var(--muted);font-size:.72rem;line-height:1.5}
+.mode-note{font-size:.7rem;color:var(--muted)}
+footer{padding:0 14px 14px;color:var(--muted);font-size:.72rem}
+@media(max-width:1120px){main{grid-template-columns:1fr 1fr}.right{grid-column:1/-1}}
+@media(max-width:760px){main{grid-template-columns:1fr}.right{grid-column:auto}.stack-layout{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>SaM Stack Frame Visualizer</h1>
+  </div>
+  <div class="controls">
+    <select id="example">
+      <option value="factorial5">factorial(5)</option>
+    </select>
+    <button id="reset">Reset</button>
+    <button id="back">← Back up one step</button>
+    <button id="next" class="primary">Step one instruction →</button>
+    <span id="counter" style="color:var(--muted);font-size:.8rem"></span>
+  </div>
+</header>
+
+<main>
+<section class="panel">
+  <h2>SaM source</h2>
+  <div class="panel-body">
+    <div class="toolbar">
+      <label>View
+        <select id="mode"><option value="annotated"></option></select>
+      </label>
+      <label>Teaching mode
+        <select id="teachingMode"><option value="beginner"></option></select>
+      </label>
+      <label><input id="changesOnly" type="checkbox"></label>
+    </div>
+    <div id="code" class="code"></div>
+    <div id="semantics" class="semantics"></div>
+    <div id="delta" class="semantics"></div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Runtime stack</h2>
+  <div class="panel-body">
+    <div class="stack-topline"><span>Addresses increase upward ↑</span><span>yellow = read · green = write</span></div>
+    <div class="stack-layout">
+      <div class="raw-zone">
+        <div class="stack-arrow">higher addresses / newer pushes ↑</div>
+        <div id="stackColumn" class="stack-column">
+          <div id="fbrMarker" class="marker fbr">FBR</div>
+          <div id="spMarker" class="marker sp">SP</div>
+          <div id="cells" class="cells"></div>
+        </div>
+        <div style="text-align:center;color:var(--muted);font-size:.7rem;margin-top:5px">address 0 / bottom of stack</div>
+      </div>
+      <div>
+        <div class="mode-note" id="frameModeNote">Teaching annotations inferred from the selected calling convention.</div>
+        <div id="frames" class="frames"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="panel right">
+  <h2>Execution</h2>
+  <div class="panel-body">
+    <div id="tree" class="call-tree"></div>
+    <div id="boundaryState" class="explain"></div>
+    <div id="phase" class="phase"></div>
+    <div id="explain" class="explain"></div>
+    <div id="registers" class="kv"></div>
+    <div id="legend" class="legend"></div>
+  </div>
+</section>
+</main>
+
+<script>
+(() => {
+const els = Object.fromEntries(["example","reset","back","next","counter","mode","teachingMode","changesOnly","code","semantics","delta","cells","frames","tree","boundaryState","phase","explain","registers","crumbs","legend","fbrMarker","spMarker","stackColumn","frameModeNote"].map(id=>[id,document.getElementById(id)]));
+
+const examples = {
+factorial5:{
+ title:"Recursive factorial",
+ source:[
+  "// @function fact",
+  "// @arg n -1",
+  "// @return -2",
+  "// main: factorial(5)",
+  "PUSHIMM 0",
+  "PUSHIMM 0",
+  "PUSHIMM 5",
+  "LINK",
+  "JSR fact",
+  "POPFBR",
+  "ADDSP -1",
+  "STOREOFF 0",
+  "STOP",
+  "",
+  "// fact: FBR-1=n, FBR-2=return slot",
+  "fact:",
+  "PUSHOFF -1",
+  "ISNIL",
+  "JUMPC FACT_BASE",
+  "PUSHIMM 0",
+  "PUSHOFF -1",
+  "PUSHIMM 1",
+  "SUB",
+  "LINK",
+  "JSR fact",
+  "POPFBR",
+  "ADDSP -1",
+  "PUSHOFF -1",
+  "TIMES",
+  "STOREOFF -2",
+  "JUMPIND",
+  "FACT_BASE:",
+  "PUSHIMM 1",
+  "STOREOFF -2",
+  "JUMPIND"
+ ],
+ frameSpec:{name:"fact",args:[[-1,"n"]],ret:-2},
+ phases:{LINK:"frame setup",JSR:"call transfer",JUMPIND:"return transfer",STOREOFF:"return value write",POPFBR:"caller restoration",ADDSP:"caller cleanup"}
+}
+};
+
+function parseAnnotations(lines){
+ const meta={name:null,args:[],ret:null,locals:[]};
+ for(const raw of lines){
+   const t=raw.trim();
+   let m=t.match(/^\/\/\s*@function\s+([A-Za-z_][A-Za-z0-9_]*)/);
+   if(m){meta.name=m[1];continue}
+   m=t.match(/^\/\/\s*@arg\s+([A-Za-z_][A-Za-z0-9_]*)\s+(-?\d+)/);
+   if(m){meta.args.push([Number(m[2]),m[1]]);continue}
+   m=t.match(/^\/\/\s*@return\s+(-?\d+)/);
+   if(m){meta.ret=Number(m[1]);continue}
+   m=t.match(/^\/\/\s*@local\s+([A-Za-z_][A-Za-z0-9_]*)\s+(-?\d+)/);
+   if(m){meta.locals.push([Number(m[2]),m[1]]);continue}
+ }
+ return meta.name && meta.ret!==null ? meta : null;
+}
+function parseSource(lines){
+ const labels={}, instructions=[], rows=[];
+ lines.forEach((text,sourceIndex)=>{
+   const trimmed=text.trim(), isComment=trimmed.startsWith("//"), isLabel=/^[A-Za-z_][A-Za-z0-9_]*:$/.test(trimmed);
+   if(isLabel) labels[trimmed.slice(0,-1)]=instructions.length;
+   let executable=false, pc="";
+   if(trimmed && !isComment && !isLabel){
+     const code=trimmed.split("//")[0].trim();
+     const [op,...rest]=code.match(/"[^"]*"|\S+/g)||[];
+     instructions.push({op,arg:rest.join(" "),sourceIndex,display:code});
+     executable=true; pc=instructions.length-1;
+   }
+   rows.push({text,sourceIndex,isComment,isLabel,executable,pc});
+ });
+ return {labels,instructions,rows};
+}
+function clone(s){return JSON.parse(JSON.stringify(s))}
+function safe(v){return v===undefined?"⟂ undefined":Number.isNaN(v)?"NaN":String(v)}
+function addrForOffset(fbr,off){return fbr+Number(off)}
+function opPhase(ex,ins){return ex.phases[ins.op]||({PUSHOFF:"stack read",PUSHIMM:"push",PUSHIMMSTR:"heap pointer push",ISNIL:"test",JUMPC:"branch",JUMP:"branch",TIMES:"arithmetic",DIV:"arithmetic",MOD:"arithmetic",ADD:"arithmetic",SUB:"arithmetic",DUP:"stack manipulation"}[ins.op]||"execute")}
+
+function initialState(){
+ return {pc:0,fbr:0,stack:[],halted:false,frames:[],heap:{},nextHeap:1000,lastSource:null,lastText:null,note:"Ready.",stepNo:0,reads:[],writes:[],pops:[],phase:"ready",error:null}
+}
+function readStack(s,a){
+ if(a<0||a>=s.stack.length) throw new Error(`invalid stack read at address ${a} (FBR=${s.fbr}, SP=${s.stack.length})`);
+ s.reads.push(a); return s.stack[a];
+}
+function writeStack(s,a,v){
+ if(a<0||a>=s.stack.length) throw new Error(`invalid stack write at address ${a} (FBR=${s.fbr}, SP=${s.stack.length})`);
+ s.writes.push(a); s.stack[a]=v;
+}
+function pop(s){ if(!s.stack.length) throw new Error("stack underflow"); const a=s.stack.length-1;s.pops.push(a);return s.stack.pop()}
+function push(s,v){s.stack.push(v);s.writes.push(s.stack.length-1)}
+
+function establishFrame(s,ex){
+ const spec=ex.frameSpec, fbr=s.fbr, args={};
+ spec.args.forEach(([off,name])=>args[name]=s.stack[fbr+off]);
+ const locals={};
+ (spec.locals||[]).forEach(([off,name])=>locals[name]=fbr+off);
+ s.frames.push({name:spec.name,fbr,retAddr:fbr+spec.ret,args,locals,returnPcAddr:fbr+1});
+}
+
+function executeOne(state,prog,ex){
+ const s=clone(state); s.reads=[];s.writes=[];s.pops=[];s.error=null;
+ if(s.halted)return s;
+ const ins=prog.instructions[s.pc]; if(!ins){s.halted=true;return s}
+ const before=clone(s), next=s.pc+1, op=ins.op, arg=ins.arg;
+ s.lastSource=ins.sourceIndex;s.lastText=ins.display;s.phase=opPhase(ex,ins);
+ try{
+ switch(op){
+  case "PUSHIMM": push(s,Number(arg));s.pc=next;break;
+  case "PUSHIMMSTR":{
+    const str=arg.replace(/^"|"$/g,""), base=s.nextHeap;
+    [...str].forEach((ch,i)=>s.heap[base+i]=ch.charCodeAt(0)); s.heap[base+str.length]=0; s.nextHeap+=str.length+8;
+    push(s,base); s.pc=next; break;
+  }
+  case "PUSHOFF":{const a=addrForOffset(s.fbr,arg);push(s,readStack(s,a));s.pc=next;break}
+  case "STOREOFF":{const v=pop(s),a=addrForOffset(s.fbr,arg);writeStack(s,a,v);s.pc=next;break}
+  case "PUSHIND":{const a=pop(s),v=s.heap[a]; if(v===undefined)throw new Error(`invalid heap read at ${a}`); push(s,v); s.note=`Read heap[${a}] = ${v}${v?` ('${String.fromCharCode(v)}')`:" (NUL)"}.`; s.pc=next;break}
+  case "LINK":{
+    const old=s.fbr;push(s,old);s.fbr=s.stack.length-1;establishFrame(s,ex);s.pc=next;break
+  }
+  case "JSR":push(s,next);s.pc=prog.labels[arg];break;
+  case "POPFBR":s.fbr=pop(s);s.pc=next;break;
+  case "ADDSP":{
+    const k=Number(arg); if(k<0){for(let i=0;i<-k;i++)pop(s)} else for(let i=0;i<k;i++)push(s,0); s.pc=next;break
+  }
+  case "ADD":{const b=pop(s),a=pop(s);push(s,a+b);s.pc=next;break}
+  case "SUB":{const b=pop(s),a=pop(s);push(s,a-b);s.pc=next;break}
+  case "DIV":{const b=pop(s),a=pop(s);if(b===0)throw new Error("division by zero");push(s,Math.trunc(a/b));s.pc=next;break}
+  case "MOD":{const b=pop(s),a=pop(s);if(b===0)throw new Error("mod by zero");push(s,a%b);s.pc=next;break}
+  case "DUP":{const a=s.stack.length-1;push(s,readStack(s,a));s.pc=next;break}
+  case "TIMES":{const b=pop(s),a=pop(s);push(s,a*b);s.pc=next;break}
+  case "ISNIL":{const v=pop(s);push(s,v===0?1:0);s.pc=next;break}
+  case "JUMPC":{const c=pop(s);s.pc=c!==0?prog.labels[arg]:next;break}
+  case "JUMP":s.pc=prog.labels[arg];break;
+  case "JUMPIND":{const target=pop(s);s.frames.pop();s.pc=target;break}
+  case "STOP":s.halted=true;s.pc=next;break;
+  default:throw new Error("Unsupported opcode "+op)
+ }
+ if(!s.note || s.note==="Ready.") s.note=describe(ins,before,s);
+ s.stepNo++;
+ }catch(err){s.error=String(err.message||err);s.halted=true;s.note="Execution stopped: "+s.error}
+ return s;
+}
+function describe(ins,b,a){
+ const op=ins.op,arg=ins.arg;
+ if(op==="LINK")return `LINK pushed old FBR ${b.fbr} and established the new frame at FBR=${a.fbr}.`;
+ if(op==="JSR")return `JSR pushed return PC ${b.pc+1} and transferred control to ${arg}.`;
+ if(op==="POPFBR")return `POPFBR restored caller FBR=${a.fbr}.`;
+ if(op==="PUSHOFF"){const ad=b.fbr+Number(arg);return `PUSHOFF ${arg}: FBR ${b.fbr} ${Number(arg)>=0?"+":"−"} ${Math.abs(Number(arg))} = ${ad}; read stack[${ad}] = ${safe(b.stack[ad])}.`}
+ if(op==="STOREOFF"){const ad=b.fbr+Number(arg);return `STOREOFF ${arg}: write the popped value into stack[${ad}].`}
+ if(op==="ADDSP")return Number(arg)<0?`Caller cleanup: discard ${-Number(arg)} stack cell(s).`:`Reserve ${arg} stack cell(s).`;
+ if(op==="JUMPIND")return `Return through the PC on TOS. The current activation record disappears.`;
+ if(op==="STOP")return `Program halted with stack[0] = ${safe(a.stack[0])}.`;
+ return `${ins.display} executed.`;
+}
+
+let ex,prog,history,index;
+
+function initialize(){
+ ex=examples[els.example.value];
+ const annotatedSpec=parseAnnotations(ex.source);
+ if(annotatedSpec) ex={...ex,frameSpec:annotatedSpec};
+ prog=parseSource(ex.source);history=[initialState()];index=0;renderSource();render();
+}
+function current(){return history[index]}
+function renderSource(){
+ els.code.innerHTML="";
+ prog.rows.forEach(r=>{
+   const d=document.createElement("div"); d.className="code-line"+(r.isComment?" comment":"")+(r.isLabel?" label":"");d.dataset.source=r.sourceIndex;
+   d.innerHTML=`<span class="ln">${r.sourceIndex+1}</span><span class="pc">${r.executable?r.pc:""}</span><span class="txt"></span>`;
+   d.querySelector(".txt").textContent=r.text||" ";els.code.appendChild(d);
+ });
+}
+function renderCode(s){
+ document.querySelectorAll(".code-line").forEach(x=>x.classList.remove("next","last"));
+ if(s.lastSource!==null){const el=document.querySelector(`.code-line[data-source="${s.lastSource}"]`);if(el)el.classList.add("last")}
+ if(!s.halted&&prog.instructions[s.pc]){const el=document.querySelector(`.code-line[data-source="${prog.instructions[s.pc].sourceIndex}"]`);if(el){el.classList.add("next");el.scrollIntoView({block:"nearest"})}}
+}
+function ownerForAddress(addr,s){
+ for(let i=s.frames.length-1;i>=0;i--){
+   const f=s.frames[i];
+   // A frame owns exactly its own activation-record cells:
+   // from the return-value slot up through the return-PC slot.
+   // This prevents adjacent frames from overlapping in color.
+   if(addr>=f.retAddr && addr<=f.returnPcAddr) return i;
+ }
+ return -1;
+}
+function annotation(addr,s){
+ if(els.mode.value==="raw" || els.teachingMode.value==="advanced")return "";
+ for(let i=s.frames.length-1;i>=0;i--){
+   const f=s.frames[i],spec=ex.frameSpec;
+   if(addr===f.retAddr)return "  return slot";
+   for(const [off,name] of spec.args)if(addr===f.fbr+off)return `  ${name}`;
+   for(const [off,name] of (spec.locals||[]))if(addr===f.fbr+off)return `  local ${name}`;
+   if(addr===f.fbr)return "  saved FBR";
+   if(addr===f.returnPcAddr && addr<s.stack.length)return "  return PC";
+ }
+ if(addr===0)return "  program result";
+ return "";
+}
+function renderStack(s){
+ const showChanges=els.changesOnly.checked;
+ const touched=new Set([...s.reads,...s.writes,...s.pops]);
+ const rows=[];
+ for(let addr=s.stack.length-1;addr>=0;addr--){
+   if(showChanges && s.stepNo>0 && !touched.has(addr) && addr!==s.fbr && addr!==s.stack.length-1) continue;
+   let cls="cell"; const owner=ownerForAddress(addr,s); if(owner>=0)cls+=" f"+((owner%6)+1);
+   if(s.reads.includes(addr))cls+=" read"; if(s.writes.includes(addr))cls+=" write"; if(s.pops.includes(addr))cls+=" pop";
+   const marks=[];if(addr===s.fbr)marks.push("FBR");if(addr===s.stack.length-1)marks.push("TOS");
+   rows.push(`<div class="${cls}" data-addr="${addr}"><div class="addr">${addr}</div><div class="value">${safe(s.stack[addr])}${annotation(addr,s)}</div><div class="mark">${marks.join(" ")}</div></div>`);
+ }
+ els.cells.innerHTML=rows.length?rows.join(""):`<div style="color:var(--muted);font-size:.78rem;text-align:center;padding:24px">empty / no changed cells</div>`;
+ requestAnimationFrame(()=>positionMarkers(s));
+}
+function positionMarkers(s){
+ const col=els.stackColumn, rows=[...els.cells.querySelectorAll(".cell")];
+ function yForAddr(addr,topMarker){
+   const row=rows.find(r=>Number(r.dataset.addr)===addr);
+   if(row){const rr=row.getBoundingClientRect(),cr=col.getBoundingClientRect();return rr.top-cr.top+(topMarker?-8:8)}
+   return 6;
+ }
+ els.fbrMarker.style.top=yForAddr(s.fbr,false)+"px";els.fbrMarker.style.display=s.stack.length?"block":"none";
+ els.spMarker.style.top=yForAddr(Math.max(0,s.stack.length-1),true)+"px";els.spMarker.style.display="block";
+ els.spMarker.textContent=`SP=${s.stack.length}`;
+ els.fbrMarker.textContent=`FBR=${s.fbr}`;
+}
+function renderFrames(s){
+ const annotated=els.mode.value==="annotated" && els.teachingMode.value==="beginner";
+ els.frameModeNote.textContent=annotated?"Teaching annotations inferred from @function/@arg/@return/@local comments.":"Advanced/raw mode: frame boxes emphasize machine-level frame boundaries and control data.";
+ if(!s.frames.length){els.frames.innerHTML=`<div style="color:var(--muted);font-size:.78rem;padding:8px">No active function frame.</div>`;return}
+ els.frames.innerHTML=s.frames.slice().reverse().map((f,ri)=>{
+   const current=ri===0, spec=ex.frameSpec, rows=[];
+   rows.push(`<tr><td>FBR+1</td><td>${f.returnPcAddr<s.stack.length?`return PC = ${safe(s.stack[f.returnPcAddr])}`:"return PC pending"}</td></tr>`);
+   rows.push(`<tr><td>FBR+0</td><td>saved FBR = ${safe(s.stack[f.fbr])}</td></tr>`);
+   if(annotated){
+    (spec.locals||[]).slice().reverse().forEach(([off,name])=>{const a=f.fbr+off;if(a<s.stack.length)rows.unshift(`<tr><td>FBR${off>=0?"+":""}${off}</td><td>${name} = ${safe(s.stack[a])}</td></tr>`)});
+    spec.args.forEach(([off,name])=>rows.push(`<tr><td>FBR${off}</td><td>${name} = ${safe(s.stack[f.fbr+off])}</td></tr>`));
+    rows.push(`<tr><td>FBR${spec.ret}</td><td>return = ${safe(s.stack[f.retAddr])}</td></tr>`);
+   }
+   return `<div class="frame ${current?"current":""}"><div class="frame-title"><span>${f.name} frame</span><span class="badge">FBR=${f.fbr}</span></div><table>${rows.join("")}</table></div>`;
+ }).join("");
+}
+function renderTree(s){
+ if(!s.frames.length){els.tree.innerHTML=`<span style="color:var(--muted)">No active calls.</span>`;return}
+ els.tree.innerHTML=s.frames.map((f,i)=>`<div class="call-node ${i===s.frames.length-1?"current":""}">${"&nbsp;&nbsp;".repeat(i)}${i?"└── ":""}${f.name}(${Object.entries(f.args).map(([k,v])=>`${k}=${v}`).join(", ")})${i===s.frames.length-1?" ← current":""}</div>`).join("");
+}
+function boundaryStateFor(s){
+ const last=s.lastText||"";
+ const next=(!s.halted&&prog.instructions[s.pc])?prog.instructions[s.pc].display:"";
+ if(last==="LINK") return {title:"Frame established",text:"Arguments and return slot are already on the stack. LINK has now saved the old FBR and established the callee frame."};
+ if(last.startsWith("JSR")) return {title:"Callee entered",text:"JSR pushed the return PC and transferred control into the callee body."};
+ if(last.startsWith("STOREOFF") && s.frames.length) return {title:"Return value written",text:"The callee has written its result into the caller-visible return slot."};
+ if(last==="JUMPIND") return {title:"Control returned",text:"The callee frame has been removed and execution has jumped back to the caller."};
+ if(last==="POPFBR") return {title:"Caller restored",text:"The caller's frame base register has been restored."};
+ if(last.startsWith("ADDSP") && s.frames.length>=0) return {title:"Caller cleanup",text:"The caller is removing argument cells that are no longer needed."};
+ if(next==="LINK") return {title:"Arguments prepared",text:"The return slot and arguments are ready. The next LINK will establish the new activation record."};
+ return {title:"Executing function body",text:"The current frame is executing ordinary instructions."};
+}
+function deltaBetween(prev,s){
+ const out=[];
+ out.push(["PC",prev?prev.pc:"—",s.halted?"HALT":s.pc]);
+ out.push(["FBR",prev?prev.fbr:"—",s.fbr]);
+ out.push(["SP",prev?prev.stack.length:"—",s.stack.length]);
+ const max=Math.max(prev?prev.stack.length:0,s.stack.length);
+ const changes=[];
+ for(let a=0;a<max;a++){
+   const b=prev?prev.stack[a]:undefined, n=s.stack[a];
+   if(b!==n) changes.push(`stack[${a}]: ${safe(b)} → ${safe(n)}`);
+ }
+ return {regs:out,changes};
+}
+function renderSemantics(s){
+ const next=!s.halted?prog.instructions[s.pc]:null;
+ els.semantics.innerHTML=`<strong>Instruction semantics</strong><div class="sem-grid">
+ <div>Last</div><div>${s.lastText||"—"}</div>
+ <div>Phase</div><div>${s.phase}</div>
+ <div>Reads</div><div>${s.reads.length?s.reads.map(a=>"stack["+a+"]").join(", "):"—"}</div>
+ <div>Writes</div><div>${s.writes.length?s.writes.map(a=>"stack["+a+"]").join(", "):"—"}</div>
+ <div>Next</div><div>${next?next.display:"—"}</div></div>`;
+}
+function renderHistory(){
+ const start=Math.max(0,index-7), bits=[];
+ for(let i=start;i<=index;i++){const s=history[i];bits.push(`<span class="crumb ${i===index?"current":""}">${i}: ${s.lastText||"start"}</span>`)}
+ //els.crumbs.innerHTML=bits.join("");
+}
+function render(){
+ const s=current(), prev=index>0?history[index-1]:null;
+ renderCode(s);renderStack(s);renderFrames(s);renderTree(s);renderSemantics(s);renderHistory();
+ const bstate=boundaryStateFor(s);
+ els.boundaryState.innerHTML=`<strong>${bstate.title}</strong><br>${bstate.text}`;
+ const d=deltaBetween(prev,s);
+ els.delta.innerHTML=`<strong>Before / after delta</strong><div class="sem-grid">${d.regs.map(r=>`<div>${r[0]}</div><div>${r[1]} → ${r[2]}</div>`).join("")}<div>Changed cells</div><div>${d.changes.length?d.changes.join("<br>"):"—"}</div></div>`;
+ els.phase.textContent=`Phase: ${s.phase}`;
+ els.explain.innerHTML=els.teachingMode.value==="advanced"
+   ? `<strong>${s.error?"Interpreter stopped":"Machine note"}</strong><br>${s.error?`<span style="color:var(--bad)">${s.error}</span>`:(s.lastText||"Ready")}`
+   : `<strong>${s.error?"Interpreter stopped":"Current explanation"}</strong><br>${s.error?`<span style="color:var(--bad)">${s.error}</span>`:s.note}`;
+ els.registers.innerHTML=`<div>PC</div><div>${s.halted?"HALT":s.pc}</div><div>FBR</div><div>${s.fbr}</div><div>SP</div><div>${s.stack.length}</div><div>TOS address</div><div>${s.stack.length?s.stack.length-1:"—"}</div><div>Active frames</div><div>${s.frames.length}</div><div>Program result</div><div>${s.stack.length?safe(s.stack[0]):"—"}</div>`;
+// els.legend.innerHTML=`<strong>${ex.title}</strong><br>${els.teachingMode.value==="beginner"?"Beginner mode shows symbolic frame names, explanatory boundary states, and detailed deltas.":"Advanced mode suppresses most symbolic stack labels so students work from the machine state."}<br>${els.mode.value==="annotated"?"Annotated view is enabled.":"Raw machine view is enabled."}`;
+ els.counter.textContent=`Step ${index}`;els.back.disabled=index===0;els.next.disabled=s.halted;
+}
+els.next.addEventListener("click",()=>{if(current().halted)return;if(index<history.length-1)index++;else{history.push(executeOne(current(),prog,ex));index++}render()});
+els.back.addEventListener("click",()=>{if(index>0){index--;render()}});
+els.reset.addEventListener("click",initialize);els.example.addEventListener("change",initialize);els.mode.addEventListener("change",render);els.teachingMode.addEventListener("change",render);els.changesOnly.addEventListener("change",render);
+document.addEventListener("keydown",e=>{if(e.target.matches("select,button,input,textarea"))return;if(e.key==="ArrowRight"&&!els.next.disabled)els.next.click();if(e.key==="ArrowLeft"&&!els.back.disabled)els.back.click()});
+initialize();
+})();
+</script>
+</body>
+</html>
