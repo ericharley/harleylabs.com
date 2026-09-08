@@ -1,0 +1,90 @@
+Program
+       ::= ClassDecl*
+
+ClassDecl
+       ::= 'class' ClassName '(' VarDecl* ')' '{' MethodDecl* '}'
+
+MethodDecl
+       ::= Type MethodName '(' Formals? ')' '{' Body '}'
+
+Body
+       ::= VarDecl* Block
+
+Formals
+       ::= Type Identifier ( ',' Type Identifier )*
+
+Actuals
+       ::= Expr ( ',' Expr )*
+
+VarDecl
+       ::= Type Identifier ( ',' Identifier )* ';'
+
+Block
+       ::= '{' Stmt+ '}'
+
+Stmt
+       ::= 'return' Expr ';'
+         | 'if' '(' Expr ')' Block 'else' Block
+         | 'while' '(' Expr ')' Block
+         | 'break' ';'
+         | Var '=' Expr ';'
+         | ';'
+
+Expr
+       ::= 'this'
+         | 'null'
+         | 'new' ClassName '(' Actuals? ')'
+         | Var '.' MethodName '(' Actuals? ')'
+         | '(' Expr '?' Expr ':' Expr ')'
+         | '(' Expr Binop Expr ')'
+         | '(' Unop Expr ')'
+         | '(' Expr ')'
+         | Var
+         | Literal
+
+Binop
+       ::= '+'
+         | '-'
+         | '*'
+         | '/'
+         | '%'
+         | '&'
+         | '|'
+         | '<'
+         | '>'
+         | '='
+
+Unop
+       ::= '~'
+         | '!'
+
+Type
+       ::= 'void'
+         | ClassName
+         | 'int'
+         | 'bool'
+         | 'String'
+
+Literal
+       ::= Num
+         | 'true'
+         | 'false'
+         | String
+
+ClassName
+       ::= Identifier
+
+MethodName
+       ::= Identifier
+
+Var
+       ::= Identifier
+
+Num
+       ::= [0-9]+
+
+String
+       ::= '"' [#x20-#x7E]* '"'
+
+Identifier
+       ::= [a-zA-Z] [a-zA-Z0-9_]*

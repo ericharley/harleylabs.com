@@ -1,0 +1,127 @@
+<p><strong>Program:</strong></p>
+<p><img src="diagram/Program.png" alt="Program"></p>
+<pre><code>Program  ::= Body
+</code></pre><p><strong>Body:</strong></p>
+<p><img src="diagram/Body.png" alt="Body"></p>
+<pre><code>Body     ::= VarDecl* Block
+</code></pre><p>referenced by:</p>
+<ul>
+<li>Program</li>
+</ul>
+<p><strong>VarDecl:</strong></p>
+<p><img src="diagram/VarDecl.png" alt="VarDecl"></p>
+<pre><code>VarDecl  ::= <span class="hljs-keyword">Type</span> <span class="hljs-type">Identifier </span>( <span class="hljs-string">','</span> Identifier )* <span class="hljs-string">';'</span>
+</code></pre><p>referenced by:</p>
+<ul>
+<li>Body</li>
+</ul>
+<p><strong>Block:</strong></p>
+<p><img src="diagram/Block.png" alt="Block"></p>
+<pre><code>Block    ::= <span class="hljs-string">'{'</span> Stmt+ <span class="hljs-string">'}'</span>
+</code></pre><p>referenced by:</p>
+<ul>
+<li>Body</li>
+<li>Stmt</li>
+</ul>
+<p><strong>Stmt:</strong></p>
+<p><img src="diagram/Stmt.png" alt="Stmt"></p>
+<pre><code>Stmt     <span class="hljs-type">::</span>= ( '<span class="hljs-keyword">if</span><span class="hljs-string">' '</span>(' <span class="hljs-built_in">Expr</span> <span class="hljs-string">')'</span> Block '<span class="hljs-keyword">else</span>' | '<span class="hljs-keyword">while</span><span class="hljs-string">' '</span>(' <span class="hljs-built_in">Expr</span> <span class="hljs-string">')'</span> ) Block
+           | ( '<span class="hljs-keyword">break</span>' | Var <span class="hljs-string">'='</span> <span class="hljs-built_in">Expr</span> )? <span class="hljs-string">';'</span>
+</code></pre><p>referenced by:</p>
+<ul>
+<li>Block</li>
+</ul>
+<p><strong>Expr:</strong></p>
+<p><img src="diagram/Expr.png" alt="Expr"></p>
+<pre><code><span class="hljs-built_in">Expr</span>     <span class="hljs-type">::</span>= <span class="hljs-string">'('</span> ( <span class="hljs-built_in">Expr</span> ( <span class="hljs-string">'?'</span> <span class="hljs-built_in">Expr</span> <span class="hljs-string">':'</span> | Binop ) | Unop )? <span class="hljs-built_in">Expr</span> <span class="hljs-string">')'</span>
+           | Var
+           | Literal
+</code></pre><p>referenced by:</p>
+<ul>
+<li>Expr</li>
+<li>Stmt</li>
+</ul>
+<p><strong>Binop:</strong></p>
+<p><img src="diagram/Binop.png" alt="Binop"></p>
+<pre><code>Binop    ::= <span class="hljs-string">'+'</span>
+           | <span class="hljs-string">'-'</span>
+           | <span class="hljs-string">'*'</span>
+           | <span class="hljs-string">'/'</span>
+           | <span class="hljs-string">'%'</span>
+           | <span class="hljs-string">'&amp;'</span>
+           | <span class="hljs-string">'|'</span>
+           | <span class="hljs-string">'&lt;'</span>
+           | <span class="hljs-string">'&gt;'</span>
+           | <span class="hljs-string">'='</span>
+</code></pre><p>referenced by:</p>
+<ul>
+<li>Expr</li>
+</ul>
+<p><strong>Unop:</strong></p>
+<p><img src="diagram/Unop.png" alt="Unop"></p>
+<pre><code>Unop     ::= <span class="hljs-string">'~'</span>
+           | '!'
+</code></pre><p>referenced by:</p>
+<ul>
+<li>Expr</li>
+</ul>
+<p><strong>Type:</strong></p>
+<p><img src="diagram/Type.png" alt="Type"></p>
+<pre><code><span class="hljs-keyword">Type</span>     <span class="hljs-type">::= </span><span class="hljs-symbol">'int</span>'
+           | <span class="hljs-symbol">'bool</span>'
+           | <span class="hljs-symbol">'String</span>'
+</code></pre><p>referenced by:</p>
+<ul>
+<li>VarDecl</li>
+</ul>
+<p><strong>Literal:</strong></p>
+<p><img src="diagram/Literal.png" alt="Literal"></p>
+<pre><code>Literal  <span class="hljs-type">::</span>= Num
+           | '<span class="hljs-literal">true</span>'
+           | '<span class="hljs-literal">false</span>'
+           | <span class="hljs-built_in">String</span>
+</code></pre><p>referenced by:</p>
+<ul>
+<li>Expr</li>
+</ul>
+<p><strong>Var:</strong></p>
+<p><img src="diagram/Var.png" alt="Var"></p>
+<pre><code>Var      ::= Identifier
+</code></pre><p>referenced by:</p>
+<ul>
+<li>Expr</li>
+<li>Stmt</li>
+</ul>
+<p><strong>Num:</strong></p>
+<p><img src="diagram/Num.png" alt="Num"></p>
+<pre><code>Num      ::= [0-9]+
+</code></pre><p>referenced by:</p>
+<ul>
+<li>Literal</li>
+</ul>
+<p><strong>String:</strong></p>
+<p><img src="diagram/String.png" alt="String"></p>
+<pre><code>String   ::= <span class="hljs-string">'"'</span> PrintableASCII* <span class="hljs-string">'"'</span>
+</code></pre><p>referenced by:</p>
+<ul>
+<li>Literal</li>
+</ul>
+<p><strong>PrintableASCII:</strong></p>
+<p><img src="diagram/PrintableASCII.png" alt="PrintableASCII"></p>
+<pre><code>PrintableASCII
+         ::= [#x20-#x7E]
+</code></pre><p>referenced by:</p>
+<ul>
+<li>String</li>
+</ul>
+<p><strong>Identifier:</strong></p>
+<p><img src="diagram/Identifier.png" alt="Identifier"></p>
+<pre><code>Identifier
+         <span class="hljs-comment">::= [a-zA-Z] [a-zA-Z0-9_]*</span>
+</code></pre><p>referenced by:</p>
+<ul>
+<li>Var</li>
+<li>VarDecl</li>
+</ul>
+<p>## 
+<img src="diagram/rr-2.6.png" alt="rr-2.6"> <sup>generated by <a href="https://www.bottlecaps.de/rr/ui">RR - Railroad Diagram Generator</a></sup></p>
